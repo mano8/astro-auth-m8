@@ -1,0 +1,76 @@
+{
+  "name": "@fa-m8/astro-auth-m8",
+  "version": "0.1.0-alpha.1",
+  "description": "Astro integration and headless client for fa-auth-m8.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mano8/astro-auth-m8.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "astro-integration",
+    "astro",
+    "auth",
+    "fa-auth-m8"
+  ],
+  "files": [
+    "dist",
+    "src/routes",
+    "src/scaffold/styles",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "astro-auth-m8": "./dist/bin/astro-auth-m8.js"
+  },
+  "exports": {
+    ".": "./dist/src/integration.js",
+    "./api": "./dist/src/runtime/api/index.js",
+    "./client": "./dist/src/runtime/client.js",
+    "./schemas": "./dist/src/runtime/schemas.js",
+    "./hooks": "./dist/src/runtime/hooks/index.js",
+    "./react": "./dist/src/runtime/react/index.js",
+    "./default-ui": "./dist/src/runtime/react/default-ui/index.js",
+    "./routes": "./dist/src/runtime/routes.js",
+    "./routes/login.astro": "./src/routes/login.astro",
+    "./routes/signup.astro": "./src/routes/signup.astro",
+    "./routes/logout.astro": "./src/routes/logout.astro",
+    "./routes/callback.astro": "./src/routes/callback.astro",
+    "./routes/account.astro": "./src/routes/account.astro",
+    "./middleware": "./dist/src/middleware.js",
+    "./compatibility": "./dist/src/runtime/compatibility.js"
+  },
+  "types": "./dist/src/integration.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "vitest run"
+  },
+  "peerDependencies": {
+    "astro": "^5.0.0 || ^6.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.9"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  },
+  "faAuthM8": {
+    "contract": "fa-auth-m8@0.9",
+    "testedServiceVersion": "0.9.8",
+    "serviceVersionRange": ">=0.9.8 <0.10.0"
+  }
+}

@@ -1,0 +1,8 @@
+---
+import { AuthProvider } from "@fa-m8/astro-auth-m8/react";
+import { LoginView } from "@fa-m8/astro-auth-m8/default-ui";
+import "../scaffold/styles/auth.css";
+---
+<AuthProvider client:load config={{ apiBase: import.meta.env.PUBLIC_FA_AUTH_API_BASE }}>
+  <LoginView />
+</AuthProvider>

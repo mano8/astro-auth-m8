@@ -1,0 +1,18 @@
+---
+import { AuthProvider } from "@fa-m8/astro-auth-m8/react";
+import { logout } from "@fa-m8/astro-auth-m8/client";
+import "../scaffold/styles/auth.css";
+---
+<AuthProvider client:load config={{ apiBase: import.meta.env.PUBLIC_FA_AUTH_API_BASE }}>
+  <form class="fa-auth-panel" method="post">
+    <h1>Sign out</h1>
+    <button type="button" id="fa-auth-logout">Sign out</button>
+  </form>
+</AuthProvider>
+<script>
+  import { logout } from "@fa-m8/astro-auth-m8/client";
+  document.getElementById("fa-auth-logout")?.addEventListener("click", async () => {
+    await logout();
+    window.location.assign("../auth/login");
+  });
+</script>
