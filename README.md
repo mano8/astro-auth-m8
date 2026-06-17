@@ -4,17 +4,19 @@ Astro integration and headless runtime client for `fa-auth-m8`.
 
 ## Backend contract
 
-This package targets the `fa-auth-m8@0.9` API contract and was built against `fa-auth-m8` service version `0.9.7`. Supported backend service versions are `>=0.9.0 <0.10.0`.
+This package targets the `fa-auth-m8@0.9` API contract and was tested against `fa-auth-m8` service version `0.9.8`. Supported backend service versions are `>=0.9.8 <0.10.0` (the floor is the first release exposing the discovery route).
 
-Compatibility helpers are exported from `@fa-m8/astro-auth-m8/compatibility`:
+Compatibility helpers are exported from `@fa-m8/astro-auth-m8/compatibility`. `fa-auth-m8` (≥ 0.9.8) exposes a public `GET {API_PREFIX}/meta` route returning a `ServiceMeta` payload — pass it straight to the assert:
 
 ```ts
 import { assertFaAuthM8Compatibility } from "@fa-m8/astro-auth-m8/compatibility";
 
-assertFaAuthM8Compatibility({ service_version: "0.9.7" });
+const meta = await fetch(`${base}/user/meta`).then((r) => r.json());
+// meta = { service, version, api_version, contract: { name, version, range } }
+assertFaAuthM8Compatibility(meta); // reads nested contract.version + version
 ```
 
-When `fa-auth-m8` exposes explicit contract metadata, prefer passing `auth_contract_version` or `contract_version` from the backend health/openapi metadata.
+The helper also accepts flat fields (`auth_contract_version` / `contract_version` / `service_version`) for backends that surface metadata elsewhere.
 
 ## Modes
 
