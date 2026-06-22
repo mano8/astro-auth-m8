@@ -74,6 +74,16 @@ namespace in `components.json` for documentation / future HTTP hosting:
 | `activity-bar-chart` | `npx shadcn add ./node_modules/@fa-m8/astro-auth-m8/registry/r/activity-bar-chart.json` | `chart` | `recharts` | no |
 | `dashboard-overview` | `npx shadcn add ./node_modules/@fa-m8/astro-auth-m8/registry/r/dashboard-overview.json` | `card`, `skeleton`, `activity-bar-chart` | — | **yes** (`useDashboard`) |
 | `account-dashboard` | `npx shadcn add ./node_modules/@fa-m8/astro-auth-m8/registry/r/account-dashboard.json` | `button`, `skeleton`, `tabs`, `dashboard-overview` | — | **yes** (`AuthProvider`, `useAuth`) |
+| `profile-panel` | `npx shadcn add ./node_modules/@fa-m8/astro-auth-m8/registry/r/profile-panel.json` | `card`, `button`, `input`, `label` | — | **yes** (`useAuth`, `useProfile`) |
+| `sessions-panel` | `npx shadcn add ./node_modules/@fa-m8/astro-auth-m8/registry/r/sessions-panel.json` | `card`, `button` | `lucide-react` | **yes** (`useAuth`, `useSessions`, `useDashboard`) |
+| `api-keys-panel` | `npx shadcn add ./node_modules/@fa-m8/astro-auth-m8/registry/r/api-keys-panel.json` | `card`, `button`, `input`, `label` | — | **yes** (`useApiKeys`) |
+| `admin-users-panel` | `npx shadcn add ./node_modules/@fa-m8/astro-auth-m8/registry/r/admin-users-panel.json` | `card`, `button`, `input`, `label` | `lucide-react` | **yes** (`RequireRole`, `useUsers`) |
+
+`dashboard-overview` is the landing view; `profile-panel`, `sessions-panel`,
+`api-keys-panel`, and `admin-users-panel` are the secondary account tabs (drop them into
+`account-dashboard`'s `extraTabs`, or into your own shell). Each reads its headless logic
+straight from the package hooks — no local adapter layer — and takes its strings via
+`labels`. `admin-users-panel` self-gates with `RequireRole superuser`.
 
 Files land under `src/components/fa-auth/` (the items' `target`), import shadcn
 primitives via `@/components/ui/*`, and pull headless logic from the installed package.

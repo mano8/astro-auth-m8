@@ -69,6 +69,64 @@
           "target": "components/fa-auth/account-dashboard.tsx"
         }
       ]
+    },
+    {
+      "name": "profile-panel",
+      "type": "registry:component",
+      "title": "Account Profile Panel",
+      "description": "fa-auth profile editor (metadata + password rotation) driven by the package's useAuth + useProfile hooks. Requires @fa-m8/astro-auth-m8 installed.",
+      "registryDependencies": ["card", "button", "input", "label"],
+      "files": [
+        {
+          "path": "registry/blocks/account/profile-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/profile-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sessions-panel",
+      "type": "registry:component",
+      "title": "Account Sessions Panel",
+      "description": "fa-auth session details + activity summaries with superuser-only session revocation, driven by the package's useSessions + useDashboard hooks. Requires @fa-m8/astro-auth-m8 installed.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["card", "button"],
+      "files": [
+        {
+          "path": "registry/blocks/account/sessions-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/sessions-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "api-keys-panel",
+      "type": "registry:component",
+      "title": "Account API Keys Panel",
+      "description": "fa-auth API token mint/revoke panel driven by the package's useApiKeys hook. Requires @fa-m8/astro-auth-m8 installed.",
+      "registryDependencies": ["card", "button", "input", "label"],
+      "files": [
+        {
+          "path": "registry/blocks/account/api-keys-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/api-keys-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "admin-users-panel",
+      "type": "registry:component",
+      "title": "Admin Users Panel",
+      "description": "fa-auth superuser-only user management (create/update/delete), gated by the package's RequireRole and driven by useUsers. Requires @fa-m8/astro-auth-m8 installed.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["card", "button", "input", "label"],
+      "files": [
+        {
+          "path": "registry/blocks/account/admin-users-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/admin-users-panel.tsx"
+        }
+      ]
     }
   ]
 }
