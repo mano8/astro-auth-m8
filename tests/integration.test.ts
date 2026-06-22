@@ -42,4 +42,49 @@ describe("Astro integration", () => {
   it("re-exports route builders", () => {
     expect(buildAuthRoutes({ base: "/[locale]" }).account).toBe("/[locale]/user/account");
   });
+
+  it("injects an empty CSP policy when middleware is not active (headless default)", () => {
+    const integration = faAuth({ apiBase: "/user" });
+    const updateConfig = vi.fn();
+    integration.hooks["astro:config:setup"]?.({ injectRoute: vi.fn(), addMiddleware: vi.fn(), updateConfig } as never);
+    const define = updateConfig.mock.calls[0][0].vite.define as Record<string, string>;
+    expect(define["import.meta.env.PUBLIC_FA_AUTH_CSP_POLICY"]).toBe(JSON.stringify(""));
+  });
+
+  it("injects a non-empty CSP policy when middleware is active", () => {
+    const integration = faAuth({ guards: { middleware: true } });
+    const updateConfig = vi.fn();
+    integration.hooks["astro:config:setup"]?.({ injectRoute: vi.fn(), addMiddleware: vi.fn(), updateConfig } as never);
+    const define = updateConfig.mock.calls[0][0].vite.define as Record<string, string>;
+    const policy = JSON.parse(define["import.meta.env.PUBLIC_FA_AUTH_CSP_POLICY"] as string) as string;
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("connect-src 'self'");
+  });
+
+  it("includes auth origin in CSP connect-src when apiBase is an external URL", () => {
+    const integration = faAuth({ apiBase: "https://auth.example.com/user", guards: { middleware: true } });
+    const updateConfig = vi.fn();
+    integration.hooks["astro:config:setup"]?.({ injectRoute: vi.fn(), addMiddleware: vi.fn(), updateConfig } as never);
+    const define = updateConfig.mock.calls[0][0].vite.define as Record<string, string>;
+    const policy = JSON.parse(define["import.meta.env.PUBLIC_FA_AUTH_CSP_POLICY"] as string) as string;
+    expect(policy).toContain("https://auth.example.com");
+  });
+
+  it("injects an empty CSP policy when csp.enabled is false even if middleware is active", () => {
+    const integration = faAuth({ guards: { middleware: true }, csp: { enabled: false } });
+    const updateConfig = vi.fn();
+    integration.hooks["astro:config:setup"]?.({ injectRoute: vi.fn(), addMiddleware: vi.fn(), updateConfig } as never);
+    const define = updateConfig.mock.calls[0][0].vite.define as Record<string, string>;
+    expect(define["import.meta.env.PUBLIC_FA_AUTH_CSP_POLICY"]).toBe(JSON.stringify(""));
+  });
+
+  it("includes connectExtraOrigins in the CSP connect-src", () => {
+    const integration = faAuth({ guards: { middleware: true }, csp: { connectExtraOrigins: ["https://media.example.com"] } });
+    const updateConfig = vi.fn();
+    integration.hooks["astro:config:setup"]?.({ injectRoute: vi.fn(), addMiddleware: vi.fn(), updateConfig } as never);
+    const define = updateConfig.mock.calls[0][0].vite.define as Record<string, string>;
+    const policy = JSON.parse(define["import.meta.env.PUBLIC_FA_AUTH_CSP_POLICY"] as string) as string;
+    expect(policy).toContain("https://media.example.com");
+  });
 });

@@ -1,5 +1,6 @@
 import type { AstroIntegration } from "astro";
 import { buildAuthRoutes, type AuthRouteFragments } from "./runtime/routes.js";
+import { buildAuthCspPolicy, type AuthCspOptions } from "./lib/csp.js";
 
 export type FaAuthAstroOptions = {
   apiBase?: string;
@@ -30,6 +31,11 @@ export type FaAuthAstroOptions = {
     protectedRoutes?: string[];
     adminRoutes?: string[];
   };
+  /** CSP header support for server/hybrid output modes. Enabled by default when the middleware is active. */
+  csp?: {
+    /** Set to false to disable CSP header injection even when the middleware is active. Default: true. */
+    enabled?: boolean;
+  } & AuthCspOptions;
 };
 
 const ROUTE_ENTRYPOINTS = {
@@ -43,6 +49,13 @@ const ROUTE_ENTRYPOINTS = {
 export default function faAuth(options: FaAuthAstroOptions = {}): AstroIntegration {
   const mode = options.mode ?? "headless";
   const routes = buildAuthRoutes(options.routes);
+  const apiBase = options.apiBase ?? "/user";
+
+  const cspEnabled = options.csp?.enabled !== false;
+  const middlewareActive = options.guards?.middleware === true;
+  const cspPolicy = cspEnabled && middlewareActive
+    ? buildAuthCspPolicy(apiBase, { connectExtraOrigins: options.csp?.connectExtraOrigins })
+    : "";
 
   return {
     name: "@fa-m8/astro-auth-m8",
@@ -51,9 +64,10 @@ export default function faAuth(options: FaAuthAstroOptions = {}): AstroIntegrati
         updateConfig({
           vite: {
             define: {
-              "import.meta.env.PUBLIC_FA_AUTH_API_BASE": JSON.stringify(options.apiBase ?? "/user"),
+              "import.meta.env.PUBLIC_FA_AUTH_API_BASE": JSON.stringify(apiBase),
               "import.meta.env.PUBLIC_FA_AUTH_REFRESH_PATH": JSON.stringify(options.auth?.refreshPath ?? "/login/refresh-token/"),
-              "import.meta.env.PUBLIC_FA_AUTH_LOGOUT_PATH": JSON.stringify(options.auth?.logoutPath ?? "/login/logout/")
+              "import.meta.env.PUBLIC_FA_AUTH_LOGOUT_PATH": JSON.stringify(options.auth?.logoutPath ?? "/login/logout/"),
+              "import.meta.env.PUBLIC_FA_AUTH_CSP_POLICY": JSON.stringify(cspPolicy),
             }
           }
         });

@@ -137,8 +137,42 @@ describe("client", () => {
 });
 
 describe("middleware", () => {
-  it("passes through to next", async () => {
+  it("passes through unchanged when no CSP policy is set", async () => {
     const response = new Response("ok");
     expect(await Promise.resolve(onRequest({}, () => response))).toBe(response);
+  });
+
+  it("injects CSP header into a sync response when policy is set", () => {
+    vi.stubEnv("PUBLIC_FA_AUTH_CSP_POLICY", "default-src 'self'");
+    const response = new Response("ok", { status: 200 });
+    const result = onRequest({}, () => response) as Response;
+    expect(result.headers.get("Content-Security-Policy")).toBe("default-src 'self'");
+    expect(result.status).toBe(200);
+    vi.unstubAllEnvs();
+  });
+
+  it("injects CSP header into an async response when policy is set", async () => {
+    vi.stubEnv("PUBLIC_FA_AUTH_CSP_POLICY", "default-src 'self'");
+    const response = new Response("ok");
+    const result = await (onRequest({}, () => Promise.resolve(response)) as Promise<Response>);
+    expect(result.headers.get("Content-Security-Policy")).toBe("default-src 'self'");
+    vi.unstubAllEnvs();
+  });
+
+  it("preserves an existing CSP header set by the caller", () => {
+    vi.stubEnv("PUBLIC_FA_AUTH_CSP_POLICY", "default-src 'self'");
+    const response = new Response("ok", { headers: { "Content-Security-Policy": "default-src 'none'" } });
+    const result = onRequest({}, () => response) as Response;
+    expect(result.headers.get("Content-Security-Policy")).toBe("default-src 'none'");
+    vi.unstubAllEnvs();
+  });
+
+  it("preserves response status and body when injecting CSP", () => {
+    vi.stubEnv("PUBLIC_FA_AUTH_CSP_POLICY", "default-src 'self'");
+    const response = new Response("hello", { status: 302, statusText: "Found" });
+    const result = onRequest({}, () => response) as Response;
+    expect(result.status).toBe(302);
+    expect(result.statusText).toBe("Found");
+    vi.unstubAllEnvs();
   });
 });
