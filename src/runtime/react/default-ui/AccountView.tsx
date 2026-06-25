@@ -11,7 +11,7 @@ export function AccountView() {
   if (!value) return <p>Please sign in to view your account.</p>;
 
   return (
-    <section className="fa-auth-panel">
+    <section className="not-content fa-auth-panel">
       <h1>Account</h1>
       <dl>
         <dt>Email</dt>

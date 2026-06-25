@@ -16,10 +16,28 @@
   gap: 12px;
 }
 
+.fa-auth-panel label {
+  padding-bottom: 0.5rem;
+}
+
 .fa-auth-panel input,
+.fa-auth-panel select,
 .fa-auth-panel button {
   min-height: 40px;
   font: inherit;
+}
+
+.fa-auth-panel select {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] .fa-auth-panel select {
+  color-scheme: dark;
+}
+
+.fa-auth-panel select option {
+  background-color: var(--popover, Canvas);
+  color: var(--popover-foreground, CanvasText);
 }
 
 .fa-auth-panel button {
