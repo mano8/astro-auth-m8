@@ -14,6 +14,42 @@ export type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const AUTH_SESSION_EVENT = "fa-auth-m8:session";
+const BOOTSTRAP_FAILURE_COOLDOWN_MS = 30_000;
+
+type AuthSessionEvent = CustomEvent<{ user: UserPublic | null }>;
+
+let bootstrapSessionPromise: Promise<UserPublic | null> | null = null;
+let bootstrapFailureUntil = 0;
+
+function emitAuthSession(user: UserPublic | null) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT, { detail: { user } }));
+}
+
+function bootstrapSession(): Promise<UserPublic | null> {
+  const now = Date.now();
+  if (bootstrapFailureUntil > now) return Promise.resolve(null);
+
+  if (!bootstrapSessionPromise) {
+    bootstrapSessionPromise = refreshToken()
+      .then(() => getProfile())
+      .then((profile) => {
+        bootstrapFailureUntil = 0;
+        emitAuthSession(profile);
+        return profile;
+      })
+      .catch((err) => {
+        bootstrapFailureUntil = Date.now() + BOOTSTRAP_FAILURE_COOLDOWN_MS;
+        throw err;
+      })
+      .finally(() => {
+        bootstrapSessionPromise = null;
+      });
+  }
+
+  return bootstrapSessionPromise;
+}
 
 export function AuthProvider({ children, config, bootstrap = true }: { children: ReactNode; config?: Partial<AuthRuntimeConfig>; bootstrap?: boolean }) {
   const [user, setUser] = useState<UserPublic | null>(null);
@@ -23,6 +59,20 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
   useEffect(() => {
     if (config) configureAuth(config);
   }, [config]);
+
+  useEffect(() => {
+    const onSession = (event: Event) => {
+      const nextUser = (event as AuthSessionEvent).detail?.user ?? null;
+      setUser(nextUser);
+      setError(null);
+      setLoading(false);
+    };
+
+    window.addEventListener(AUTH_SESSION_EVENT, onSession);
+    return () => {
+      window.removeEventListener(AUTH_SESSION_EVENT, onSession);
+    };
+  }, []);
 
   const reload = useCallback(async () => {
     try {
@@ -41,8 +91,13 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
     if (!bootstrap) return;
     let cancelled = false;
     setLoading(true);
-    refreshToken()
-      .then(() => reload())
+    bootstrapSession()
+      .then((profile) => {
+        if (!cancelled) {
+          setUser(profile);
+          setError(null);
+        }
+      })
       .catch((err) => {
         if (!cancelled) {
           setUser(null);
@@ -60,14 +115,17 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
   const login = useCallback(async (username: string, password: string) => {
     await apiLogin(username, password);
     const profile = await getProfile();
+    bootstrapFailureUntil = 0;
     setUser(profile);
     setError(null);
+    emitAuthSession(profile);
     return profile;
   }, []);
 
   const logout = useCallback(async () => {
     await apiLogout();
     setUser(null);
+    emitAuthSession(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({ user, loading, error, login, logout, reload }), [user, loading, error, login, logout, reload]);

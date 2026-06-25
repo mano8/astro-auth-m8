@@ -2,6 +2,8 @@ import { request } from "../client.js";
 import { ResponseMessageSchema, TokenSchema, UserPublicSchema, type ResponseMessage, type Token, type UserPublic } from "../schemas.js";
 import { clearToken, setToken } from "../tokenStore.js";
 
+let refreshTokenPromise: Promise<Token> | null = null;
+
 export async function login(username: string, password: string): Promise<Token> {
   const token = await request({
     method: "POST",
@@ -15,14 +17,23 @@ export async function login(username: string, password: string): Promise<Token> 
 }
 
 export async function refreshToken(): Promise<Token> {
-  const token = await request({
-    method: "POST",
-    path: "/login/refresh-token/",
-    schema: TokenSchema,
-    skipRefresh: true
-  });
-  setToken(token.access_token);
-  return token;
+  if (!refreshTokenPromise) {
+    refreshTokenPromise = request({
+      method: "POST",
+      path: "/login/refresh-token/",
+      schema: TokenSchema,
+      skipRefresh: true
+    })
+      .then((token) => {
+        setToken(token.access_token);
+        return token;
+      })
+      .finally(() => {
+        refreshTokenPromise = null;
+      });
+  }
+
+  return refreshTokenPromise;
 }
 
 export async function logout(): Promise<ResponseMessage> {
