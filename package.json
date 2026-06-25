@@ -35,6 +35,7 @@
     "./client": "./dist/src/runtime/client.js",
     "./schemas": "./dist/src/runtime/schemas.js",
     "./hooks": "./dist/src/runtime/hooks/index.js",
+    "./list-params": "./dist/src/runtime/listParams.js",
     "./react": "./dist/src/runtime/react/index.js",
     "./default-ui": "./dist/src/runtime/react/default-ui/index.js",
     "./routes": "./dist/src/runtime/routes.js",

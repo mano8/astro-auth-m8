@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { configureAuth, getAuthConfig, resetAuthConfig } from "../src/runtime/config.js";
 import { ApiError, messageFromDetail, normalizeFastApiError, UnauthenticatedError } from "../src/runtime/errors.js";
 import { clearToken, getToken, runRefresh, setToken } from "../src/runtime/tokenStore.js";
@@ -7,6 +9,7 @@ import { MessageSchema, TokenSchema } from "../src/runtime/schemas.js";
 import { onRequest } from "../src/middleware.js";
 
 const jsonResponse = (body: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" }, ...init });
+const sourceFile = (path: string) => readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), "utf8");
 
 describe("runtime config", () => {
   afterEach(() => resetAuthConfig());
@@ -57,6 +60,35 @@ describe("token store", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     clearToken();
     expect(getToken()).toBeNull();
+  });
+
+  it("keeps React Query files out of token persistence and refresh mechanics", () => {
+    const reactQueryFiles = [
+      "src/runtime/react/AuthQueryProvider.tsx",
+      "src/runtime/hooks/useApiKeys.ts",
+      "src/runtime/hooks/useDashboard.ts",
+      "src/runtime/hooks/useProfile.ts",
+      "src/runtime/hooks/useSessions.ts",
+      "src/runtime/hooks/useUsers.ts"
+    ];
+    const forbiddenBoundaryTerms = [
+      "tokenStore",
+      "getToken",
+      "setToken",
+      "clearToken",
+      "runRefresh",
+      "refreshToken",
+      "localStorage",
+      "sessionStorage"
+    ];
+
+    for (const file of reactQueryFiles) {
+      const source = sourceFile(file);
+      expect(source).toContain("@tanstack/react-query");
+      for (const term of forbiddenBoundaryTerms) {
+        expect(source, `${file} must not own ${term}`).not.toContain(term);
+      }
+    }
   });
 });
 
