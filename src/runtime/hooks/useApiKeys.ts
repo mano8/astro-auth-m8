@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { createApiKey, listApiKeys, revokeApiKey } from "../api/apiKeys.js";
 import { authKeys } from "../queryKeys.js";
 import type { ApiKeyCreate, ApiKeyCreated, ApiKeyPublic } from "../schemas.js";
 
 export function useApiKeys(load = true) {
+  const queryClient = useQueryClient();
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null);
   const apiKeysQuery = useQuery({
     queryKey: authKeys.apiKeys(),
@@ -18,18 +19,22 @@ export function useApiKeys(load = true) {
     return result.data ?? [];
   }, [apiKeysQuery]);
 
-  const create = useCallback(async (body: ApiKeyCreate) => {
-    const key = await createApiKey(body);
-    setCreatedKey(key);
-    await reload();
-    return key;
-  }, [reload]);
+  const createMutation = useMutation({
+    mutationFn: createApiKey,
+    onSuccess: async (key) => {
+      setCreatedKey(key);
+      await queryClient.invalidateQueries({ queryKey: authKeys.apiKeys() });
+    }
+  });
+  const revokeMutation = useMutation({
+    mutationFn: revokeApiKey,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: authKeys.apiKeys() });
+    }
+  });
 
-  const revoke = useCallback(async (id: string) => {
-    const message = await revokeApiKey(id);
-    await reload();
-    return message;
-  }, [reload]);
+  const create = useCallback((body: ApiKeyCreate) => createMutation.mutateAsync(body), [createMutation]);
+  const revoke = useCallback((id: string) => revokeMutation.mutateAsync(id), [revokeMutation]);
 
   const apiKeys: ApiKeyPublic[] = apiKeysQuery.data ?? [];
   const loading = apiKeysQuery.isLoading || apiKeysQuery.isFetching;
@@ -42,6 +47,8 @@ export function useApiKeys(load = true) {
     reload,
     create,
     revoke,
+    createMutation,
+    revokeMutation,
     isLoading: apiKeysQuery.isLoading,
     isFetching: apiKeysQuery.isFetching,
     refetch: apiKeysQuery.refetch

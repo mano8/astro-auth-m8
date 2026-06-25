@@ -6,11 +6,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 
 const authApi = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), refreshToken: vi.fn() }));
-const profileApi = vi.hoisted(() => ({ getProfile: vi.fn(), updateProfile: vi.fn() }));
+const profileApi = vi.hoisted(() => ({ deleteProfile: vi.fn(), getProfile: vi.fn(), updatePassword: vi.fn(), updateProfile: vi.fn() }));
 const apiKeyApi = vi.hoisted(() => ({ listApiKeys: vi.fn(), createApiKey: vi.fn(), revokeApiKey: vi.fn() }));
 const dashboardApi = vi.hoisted(() => ({ getGlobalActivity: vi.fn(), getUserActivity: vi.fn() }));
-const sessionApi = vi.hoisted(() => ({ getCurrentSession: vi.fn(), listSessions: vi.fn() }));
-const userApi = vi.hoisted(() => ({ listUsers: vi.fn() }));
+const sessionApi = vi.hoisted(() => ({ getCurrentSession: vi.fn(), listSessions: vi.fn(), revokeSession: vi.fn() }));
+const userApi = vi.hoisted(() => ({ createUser: vi.fn(), deleteUser: vi.fn(), getUser: vi.fn(), listUsers: vi.fn(), signupUser: vi.fn(), updateUser: vi.fn() }));
 const oauthApi = vi.hoisted(() => ({ createPkcePair: vi.fn(), getGoogleLoginUrl: vi.fn(), savePkceVerifier: vi.fn(), exchangeGoogleCode: vi.fn(), takePkceVerifier: vi.fn() }));
 
 vi.mock("../src/runtime/api/auth.js", () => authApi);
@@ -29,6 +29,7 @@ import { useGoogleLogin } from "../src/runtime/hooks/useGoogleLogin.js";
 import { useProfile } from "../src/runtime/hooks/useProfile.js";
 import { useSessions } from "../src/runtime/hooks/useSessions.js";
 import { useUsers } from "../src/runtime/hooks/useUsers.js";
+import { authKeys } from "../src/runtime/queryKeys.js";
 
 const user = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -87,8 +88,16 @@ function HookProbe<T>({ hook, expose }: { hook: () => T; expose: (value: T) => v
 }
 
 function HookHarness({ children }: { children: ReactNode }) {
-  const [client] = React.useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  const [client] = React.useState(() => createTestQueryClient());
   return <AuthQueryProvider client={client}>{children}</AuthQueryProvider>;
+}
+
+function HookHarnessWithClient({ children, client }: { children: ReactNode; client: QueryClient }) {
+  return <AuthQueryProvider client={client}>{children}</AuthQueryProvider>;
+}
+
+function createTestQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
 function QueryClientProbe({ expose }: { expose: (client: QueryClient) => void }) {
@@ -104,6 +113,8 @@ beforeEach(() => {
   authApi.refreshToken.mockResolvedValue({ access_token: "token", token_type: "bearer" });
   profileApi.getProfile.mockResolvedValue(user);
   profileApi.updateProfile.mockResolvedValue({ success: true, user });
+  profileApi.updatePassword.mockResolvedValue({ message: "password changed" });
+  profileApi.deleteProfile.mockResolvedValue({ message: "deleted" });
   apiKeyApi.listApiKeys.mockResolvedValue([{ id: "11111111-1111-4111-8111-111111111112", name: "key", expires_at: null, revoked: false, last_used_at: null }]);
   apiKeyApi.createApiKey.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111113", name: "new", expires_at: null, revoked: false, last_used_at: null, plaintext: "secret" });
   apiKeyApi.revokeApiKey.mockResolvedValue({ message: "revoked" });
@@ -111,7 +122,13 @@ beforeEach(() => {
   dashboardApi.getGlobalActivity.mockResolvedValue({ nb_users: 2, activity: { min: 0, max: 2, activity: [] } });
   sessionApi.getCurrentSession.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111114", provider: "password", user_agent: null, ip_address: null, created_at: "2026-06-25T10:00:00Z", last_seen_at: "2026-06-25T10:00:00Z", expires_at: "2026-06-26T10:00:00Z" });
   sessionApi.listSessions.mockResolvedValue({ data: [], count: 0 });
+  sessionApi.revokeSession.mockResolvedValue({ message: "revoked" });
+  userApi.createUser.mockResolvedValue(user);
+  userApi.signupUser.mockResolvedValue(user);
+  userApi.getUser.mockResolvedValue(user);
   userApi.listUsers.mockResolvedValue({ data: [user], count: 1 });
+  userApi.updateUser.mockResolvedValue(user);
+  userApi.deleteUser.mockResolvedValue({ message: "deleted" });
   oauthApi.createPkcePair.mockResolvedValue({ verifier: "verifier", challenge: "challenge" });
   oauthApi.getGoogleLoginUrl.mockResolvedValue({ url: "https://accounts.test" });
   oauthApi.takePkceVerifier.mockReturnValue("verifier");
@@ -203,11 +220,18 @@ describe("AuthProvider and guards", () => {
 describe("hooks", () => {
   it("covers profile hook success and error paths", async () => {
     let hook: ReturnType<typeof useProfile>;
-    const view = render(<HookHarness><HookProbe hook={() => useProfile(false)} expose={(v) => { hook = v; }} /></HookHarness>);
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const removeSpy = vi.spyOn(client, "removeQueries");
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useProfile(false)} expose={(v) => { hook = v; }} /></HookHarnessWithClient>);
     await act(async () => { await hook!.reload(); });
     await waitFor(() => expect(hook!.profile?.email).toBe("ada@example.com"));
     expect(hook!.loading).toBe(false);
     await act(async () => { await hook!.save({ full_name: "Ada" }); });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.profile() });
+    await act(async () => { await hook!.changePassword({ current_password: "password1", new_password: "password2" }); });
+    await act(async () => { await hook!.remove(); });
+    expect(removeSpy).toHaveBeenCalledWith({ queryKey: authKeys.profile(), exact: true });
     profileApi.getProfile.mockRejectedValueOnce(new Error("boom"));
     await act(async () => { await expect(hook!.reload()).rejects.toThrow("boom"); });
     view.unmount();
@@ -215,12 +239,16 @@ describe("hooks", () => {
 
   it("covers API key hook success and error paths", async () => {
     let hook: ReturnType<typeof useApiKeys>;
-    const view = render(<HookHarness><HookProbe hook={() => useApiKeys(false)} expose={(v) => { hook = v; }} /></HookHarness>);
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useApiKeys(false)} expose={(v) => { hook = v; }} /></HookHarnessWithClient>);
     await act(async () => { await hook!.reload(); });
     await waitFor(() => expect(hook!.apiKeys).toHaveLength(1));
     await act(async () => { await hook!.create({ ttl_hours: 1 }); });
     await waitFor(() => expect(hook!.createdKey?.plaintext).toBe("secret"));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.apiKeys() });
     await act(async () => { await hook!.revoke("id"); });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.apiKeys() });
     apiKeyApi.listApiKeys.mockRejectedValueOnce(new Error("keys failed"));
     await act(async () => { await expect(hook!.reload()).rejects.toThrow("keys failed"); });
     view.unmount();
@@ -231,7 +259,9 @@ describe("hooks", () => {
     let globalDash: ReturnType<typeof useDashboard>;
     let usersHook: ReturnType<typeof useUsers>;
     let sessionsHook: ReturnType<typeof useSessions>;
-    const view = render(<HookHarness><HookProbe hook={() => useDashboard("me", false)} expose={(v) => { dash = v; }} /><HookProbe hook={() => useDashboard("global", false)} expose={(v) => { globalDash = v; }} /><HookProbe hook={() => useUsers(false)} expose={(v) => { usersHook = v; }} /><HookProbe hook={() => useSessions(false)} expose={(v) => { sessionsHook = v; }} /></HookHarness>);
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useDashboard("me", false)} expose={(v) => { dash = v; }} /><HookProbe hook={() => useDashboard("global", false)} expose={(v) => { globalDash = v; }} /><HookProbe hook={() => useUsers(false)} expose={(v) => { usersHook = v; }} /><HookProbe hook={() => useSessions(false)} expose={(v) => { sessionsHook = v; }} /></HookHarnessWithClient>);
     await act(async () => { await dash!.reload(); await globalDash!.reload(); await usersHook!.reload(); await sessionsHook!.reload(); });
     await waitFor(() => {
       expect(dash!.activity?.nb_users).toBe(1);
@@ -239,6 +269,15 @@ describe("hooks", () => {
       expect(usersHook!.users?.count).toBe(1);
       expect(sessionsHook!.sessions?.count).toBe(0);
     });
+    await act(async () => { await usersHook!.create({ provider: "password", email: "ada@example.com", password: "password1" }); });
+    await act(async () => { await usersHook!.signup({ email: "ada@example.com", password: "password1" }); });
+    await act(async () => { await usersHook!.get(user.id); });
+    await act(async () => { await usersHook!.update(user.id, { full_name: "Ada Lovelace" }); });
+    await act(async () => { await usersHook!.remove(user.id); });
+    await act(async () => { await sessionsHook!.revoke("session-id"); });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.users() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.user(user.id) });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.sessions() });
     dashboardApi.getUserActivity.mockRejectedValueOnce(new Error("dash failed"));
     userApi.listUsers.mockRejectedValueOnce(new Error("users failed"));
     sessionApi.listSessions.mockRejectedValueOnce(new Error("sessions failed"));
