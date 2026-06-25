@@ -41,6 +41,24 @@ describe("auth API", () => {
     await auth.testToken();
     expect(requestMock).toHaveBeenLastCalledWith(expect.objectContaining({ path: "/login/test-token/", auth: true }));
   });
+
+  it("reuses the in-flight refresh request", async () => {
+    let resolveRefresh: ((value: { access_token: string; token_type: string }) => void) | undefined;
+    requestMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveRefresh = resolve;
+    }));
+
+    const first = auth.refreshToken();
+    const second = auth.refreshToken();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    resolveRefresh?.({ access_token: "shared", token_type: "bearer" });
+
+    await expect(first).resolves.toMatchObject({ access_token: "shared" });
+    await expect(second).resolves.toMatchObject({ access_token: "shared" });
+    expect(setToken).toHaveBeenCalledTimes(1);
+    expect(setToken).toHaveBeenCalledWith("shared");
+  });
 });
 
 describe("feature API wrappers", () => {

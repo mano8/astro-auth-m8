@@ -3,6 +3,7 @@ import React, { type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 
 const authApi = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), refreshToken: vi.fn() }));
 const profileApi = vi.hoisted(() => ({ getProfile: vi.fn(), updateProfile: vi.fn() }));
@@ -20,7 +21,7 @@ vi.mock("../src/runtime/api/sessions.js", () => sessionApi);
 vi.mock("../src/runtime/api/users.js", () => userApi);
 vi.mock("../src/runtime/api/oauth.js", () => oauthApi);
 
-import { AuthProvider, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
+import { AuthProvider, AuthQueryProvider, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
 import { AccountView, CallbackView, LoginView, SignupView } from "../src/runtime/react/default-ui/index.js";
 import { useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
 import { useDashboard } from "../src/runtime/hooks/useDashboard.js";
@@ -68,6 +69,12 @@ function HookProbe<T>({ hook, expose }: { hook: () => T; expose: (value: T) => v
   return null;
 }
 
+function QueryClientProbe({ expose }: { expose: (client: QueryClient) => void }) {
+  const client = useQueryClient();
+  expose(client);
+  return null;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   authApi.login.mockResolvedValue({ access_token: "token", token_type: "bearer" });
@@ -94,6 +101,48 @@ afterEach(() => {
 });
 
 describe("AuthProvider and guards", () => {
+  it("creates one stable query client and supports injected or parent-owned clients", async () => {
+    const seenClients: QueryClient[] = [];
+    const customClient = new QueryClient();
+    const parentClient = new QueryClient();
+
+    function StableProbe() {
+      const [, setTick] = React.useState(0);
+      const client = useQueryClient();
+      seenClients.push(client);
+      return <button onClick={() => setTick((value) => value + 1)}>rerender</button>;
+    }
+
+    let providedClient: QueryClient | undefined;
+    let inheritedClient: QueryClient | undefined;
+
+    const stableView = render(<AuthQueryProvider><StableProbe /></AuthQueryProvider>);
+    await flush();
+    act(() => {
+      stableView.container.querySelector("button")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flush();
+    expect(seenClients).toHaveLength(2);
+    expect(seenClients[0]).toBe(seenClients[1]);
+    stableView.unmount();
+
+    const customView = render(<AuthQueryProvider client={customClient}><QueryClientProbe expose={(client) => { providedClient = client; }} /></AuthQueryProvider>);
+    await flush();
+    expect(providedClient).toBe(customClient);
+    customView.unmount();
+
+    const nestedView = render(
+      <QueryClientProvider client={parentClient}>
+        <AuthQueryProvider client={customClient}>
+          <QueryClientProbe expose={(client) => { inheritedClient = client; }} />
+        </AuthQueryProvider>
+      </QueryClientProvider>
+    );
+    await flush();
+    expect(inheritedClient).toBe(parentClient);
+    nestedView.unmount();
+  });
+
   it("bootstraps, logs in, reloads, logs out, and renders guards", async () => {
     let auth: ReturnType<typeof useAuth> | undefined;
     function Probe() {
