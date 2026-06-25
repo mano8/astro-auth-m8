@@ -8,7 +8,7 @@ export type AuthQueryProviderProps = {
 
 export function AuthQueryProvider({ children, client }: AuthQueryProviderProps) {
   const parentClient = useContext(QueryClientContext);
-  const [ownedClient] = useState(() => client ?? new QueryClient());
+  const [ownedClient] = useState(() => client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } }));
 
   if (parentClient) return <>{children}</>;
 

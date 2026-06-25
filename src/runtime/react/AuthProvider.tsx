@@ -3,6 +3,7 @@ import { configureAuth, type AuthRuntimeConfig } from "../config.js";
 import { login as apiLogin, logout as apiLogout, refreshToken } from "../api/auth.js";
 import { getProfile } from "../api/profile.js";
 import type { UserPublic } from "../schemas.js";
+import { AuthQueryProvider } from "./AuthQueryProvider.js";
 
 export type AuthContextValue = {
   user: UserPublic | null;
@@ -129,7 +130,11 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({ user, loading, error, login, logout, reload }), [user, loading, error, login, logout, reload]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthQueryProvider>
+      <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    </AuthQueryProvider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

@@ -9,7 +9,7 @@ const authApi = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), refreshToke
 const profileApi = vi.hoisted(() => ({ getProfile: vi.fn(), updateProfile: vi.fn() }));
 const apiKeyApi = vi.hoisted(() => ({ listApiKeys: vi.fn(), createApiKey: vi.fn(), revokeApiKey: vi.fn() }));
 const dashboardApi = vi.hoisted(() => ({ getGlobalActivity: vi.fn(), getUserActivity: vi.fn() }));
-const sessionApi = vi.hoisted(() => ({ listSessions: vi.fn() }));
+const sessionApi = vi.hoisted(() => ({ getCurrentSession: vi.fn(), listSessions: vi.fn() }));
 const userApi = vi.hoisted(() => ({ listUsers: vi.fn() }));
 const oauthApi = vi.hoisted(() => ({ createPkcePair: vi.fn(), getGoogleLoginUrl: vi.fn(), savePkceVerifier: vi.fn(), exchangeGoogleCode: vi.fn(), takePkceVerifier: vi.fn() }));
 
@@ -42,11 +42,28 @@ const user = {
   role: "admin" as const
 };
 
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
 function flush() {
   return act(async () => {
     await Promise.resolve();
     await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
+}
+
+async function waitFor(assertion: () => void) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      assertion();
+      return;
+    } catch (err) {
+      lastError = err;
+      await flush();
+    }
+  }
+  throw lastError;
 }
 
 function render(element: ReactNode) {
@@ -69,6 +86,11 @@ function HookProbe<T>({ hook, expose }: { hook: () => T; expose: (value: T) => v
   return null;
 }
 
+function HookHarness({ children }: { children: ReactNode }) {
+  const [client] = React.useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return <AuthQueryProvider client={client}>{children}</AuthQueryProvider>;
+}
+
 function QueryClientProbe({ expose }: { expose: (client: QueryClient) => void }) {
   const client = useQueryClient();
   expose(client);
@@ -87,6 +109,7 @@ beforeEach(() => {
   apiKeyApi.revokeApiKey.mockResolvedValue({ message: "revoked" });
   dashboardApi.getUserActivity.mockResolvedValue({ nb_users: 1, activity: { min: 0, max: 1, activity: [] } });
   dashboardApi.getGlobalActivity.mockResolvedValue({ nb_users: 2, activity: { min: 0, max: 2, activity: [] } });
+  sessionApi.getCurrentSession.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111114", provider: "password", user_agent: null, ip_address: null, created_at: "2026-06-25T10:00:00Z", last_seen_at: "2026-06-25T10:00:00Z", expires_at: "2026-06-26T10:00:00Z" });
   sessionApi.listSessions.mockResolvedValue({ data: [], count: 0 });
   userApi.listUsers.mockResolvedValue({ data: [user], count: 1 });
   oauthApi.createPkcePair.mockResolvedValue({ verifier: "verifier", challenge: "challenge" });
@@ -180,8 +203,10 @@ describe("AuthProvider and guards", () => {
 describe("hooks", () => {
   it("covers profile hook success and error paths", async () => {
     let hook: ReturnType<typeof useProfile>;
-    const view = render(<HookProbe hook={() => useProfile(false)} expose={(v) => { hook = v; }} />);
+    const view = render(<HookHarness><HookProbe hook={() => useProfile(false)} expose={(v) => { hook = v; }} /></HookHarness>);
     await act(async () => { await hook!.reload(); });
+    await waitFor(() => expect(hook!.profile?.email).toBe("ada@example.com"));
+    expect(hook!.loading).toBe(false);
     await act(async () => { await hook!.save({ full_name: "Ada" }); });
     profileApi.getProfile.mockRejectedValueOnce(new Error("boom"));
     await act(async () => { await expect(hook!.reload()).rejects.toThrow("boom"); });
@@ -190,9 +215,11 @@ describe("hooks", () => {
 
   it("covers API key hook success and error paths", async () => {
     let hook: ReturnType<typeof useApiKeys>;
-    const view = render(<HookProbe hook={() => useApiKeys(false)} expose={(v) => { hook = v; }} />);
+    const view = render(<HookHarness><HookProbe hook={() => useApiKeys(false)} expose={(v) => { hook = v; }} /></HookHarness>);
     await act(async () => { await hook!.reload(); });
+    await waitFor(() => expect(hook!.apiKeys).toHaveLength(1));
     await act(async () => { await hook!.create({ ttl_hours: 1 }); });
+    await waitFor(() => expect(hook!.createdKey?.plaintext).toBe("secret"));
     await act(async () => { await hook!.revoke("id"); });
     apiKeyApi.listApiKeys.mockRejectedValueOnce(new Error("keys failed"));
     await act(async () => { await expect(hook!.reload()).rejects.toThrow("keys failed"); });
@@ -204,8 +231,14 @@ describe("hooks", () => {
     let globalDash: ReturnType<typeof useDashboard>;
     let usersHook: ReturnType<typeof useUsers>;
     let sessionsHook: ReturnType<typeof useSessions>;
-    const view = render(<><HookProbe hook={() => useDashboard("me", false)} expose={(v) => { dash = v; }} /><HookProbe hook={() => useDashboard("global", false)} expose={(v) => { globalDash = v; }} /><HookProbe hook={() => useUsers(false)} expose={(v) => { usersHook = v; }} /><HookProbe hook={() => useSessions(false)} expose={(v) => { sessionsHook = v; }} /></>);
+    const view = render(<HookHarness><HookProbe hook={() => useDashboard("me", false)} expose={(v) => { dash = v; }} /><HookProbe hook={() => useDashboard("global", false)} expose={(v) => { globalDash = v; }} /><HookProbe hook={() => useUsers(false)} expose={(v) => { usersHook = v; }} /><HookProbe hook={() => useSessions(false)} expose={(v) => { sessionsHook = v; }} /></HookHarness>);
     await act(async () => { await dash!.reload(); await globalDash!.reload(); await usersHook!.reload(); await sessionsHook!.reload(); });
+    await waitFor(() => {
+      expect(dash!.activity?.nb_users).toBe(1);
+      expect(globalDash!.activity?.nb_users).toBe(2);
+      expect(usersHook!.users?.count).toBe(1);
+      expect(sessionsHook!.sessions?.count).toBe(0);
+    });
     dashboardApi.getUserActivity.mockRejectedValueOnce(new Error("dash failed"));
     userApi.listUsers.mockRejectedValueOnce(new Error("users failed"));
     sessionApi.listSessions.mockRejectedValueOnce(new Error("sessions failed"));
@@ -247,14 +280,12 @@ describe("default UI", () => {
 
   it("renders account states and logout", async () => {
     let view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
-    await flush();
-    expect(view.container.textContent).toContain("ada@example.com");
+    await waitFor(() => expect(view.container.textContent).toContain("ada@example.com"));
     await act(async () => { view.container.querySelector("button")!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
     view.unmount();
     profileApi.getProfile.mockRejectedValueOnce(new Error("profile failed"));
     view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
-    await flush();
-    expect(view.container.textContent).toContain("Unable to load account");
+    await waitFor(() => expect(view.container.textContent).toContain("Unable to load account"));
     view.unmount();
   });
 

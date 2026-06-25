@@ -1,48 +1,52 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { getCurrentSession, listSessions, revokeSession } from "../api/sessions.js";
+import { authKeys } from "../queryKeys.js";
 import type { ClientSessionPublic, ClientSessionsPublic } from "../schemas.js";
 
+const currentSessionKey = [...authKeys.sessions(), "current"] as const;
+
 export function useSessions(load = true) {
-  const [sessions, setSessions] = useState<ClientSessionsPublic | null>(null);
-  const [current, setCurrent] = useState<ClientSessionPublic | null>(null);
-  const [loading, setLoading] = useState(load);
-  const [error, setError] = useState<unknown>(null);
+  const sessionsQuery = useQuery({
+    queryKey: authKeys.sessions(),
+    queryFn: () => listSessions(),
+    enabled: load,
+    staleTime: 30_000
+  });
+  const currentQuery = useQuery({
+    queryKey: currentSessionKey,
+    queryFn: getCurrentSession,
+    enabled: false,
+    staleTime: 30_000
+  });
 
   const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const value = await listSessions();
-      setSessions(value);
-      setError(null);
-      return value;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    const result = await sessionsQuery.refetch({ throwOnError: true });
+    return result.data ?? null;
+  }, [sessionsQuery]);
 
   const reloadCurrent = useCallback(async () => {
-    setLoading(true);
-    try {
-      const value = await getCurrentSession();
-      setCurrent(value);
-      setError(null);
-      return value;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    const result = await currentQuery.refetch({ throwOnError: true });
+    return result.data ?? null;
+  }, [currentQuery]);
 
   const revoke = useCallback((id: string) => revokeSession(id), []);
 
-  useEffect(() => {
-    if (load) void reload().catch(() => undefined);
-  }, [load, reload]);
+  const sessions: ClientSessionsPublic | null = sessionsQuery.data ?? null;
+  const current: ClientSessionPublic | null = currentQuery.data ?? null;
+  const loading = sessionsQuery.isLoading || sessionsQuery.isFetching || currentQuery.isFetching;
+  const error = sessionsQuery.error ?? currentQuery.error;
 
-  return { sessions, current, loading, error, reload, reloadCurrent, revoke };
+  return {
+    sessions,
+    current,
+    loading,
+    error,
+    reload,
+    reloadCurrent,
+    revoke,
+    isLoading: sessionsQuery.isLoading,
+    isFetching: sessionsQuery.isFetching || currentQuery.isFetching,
+    refetch: sessionsQuery.refetch
+  };
 }
