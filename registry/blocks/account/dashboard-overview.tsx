@@ -54,7 +54,7 @@ function StatCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {label}
@@ -86,8 +86,8 @@ export function DashboardOverview({
 
   if (loading) {
     return (
-      <div className="space-y-4" aria-busy="true">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="not-content space-y-4" aria-busy="true">
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-28 w-full" />
           ))}
@@ -108,13 +108,13 @@ export function DashboardOverview({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="not-content space-y-6">
       <div className="space-y-1">
         <h2 className="text-xl font-semibold tracking-tight">{t.title}</h2>
         <p className="text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label={t.users}
           value={(activity?.nb_users ?? 0).toLocaleString()}

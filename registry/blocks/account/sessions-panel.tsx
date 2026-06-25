@@ -132,8 +132,8 @@ export function SessionsPanel({ labels }: { labels?: Partial<SessionsPanelLabels
   }, [isSuperuser, list, reloadAll]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
+    <div className="not-content grid auto-rows-fr gap-6 lg:grid-cols-2">
+      <Card className="h-full">
         <CardHeader>
           <CardTitle>{t.title}</CardTitle>
           <CardDescription>{t.description}</CardDescription>
@@ -174,7 +174,7 @@ export function SessionsPanel({ labels }: { labels?: Partial<SessionsPanelLabels
       </Card>
 
       {isSuperuser && (
-        <Card>
+        <Card className="h-full">
           <CardHeader>
             <CardTitle>{t.adminTitle}</CardTitle>
             <CardDescription>{t.adminDescription}</CardDescription>

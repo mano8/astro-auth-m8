@@ -99,6 +99,9 @@ function formString(formData: FormData, key: string): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+const inputClassName =
+  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40";
+
 function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
   const { users: usersData, loading, error, reload, create, update, remove } = useUsers(false);
   const users = usersData?.data ?? [];
@@ -174,7 +177,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
   };
 
   return (
-    <Card>
+    <Card className="not-content">
       <CardHeader>
         <CardTitle>{t.title}</CardTitle>
         <CardDescription>{t.description}</CardDescription>
@@ -185,32 +188,32 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
         </p>
         <form onSubmit={handleCreate} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 md:items-end">
           <div className="space-y-1">
-            <Label htmlFor="admin-create-email">{t.email}</Label>
+            <Label htmlFor="admin-create-email" className="pb-2">{t.email}</Label>
             <Input id="admin-create-email" name="email" type="email" required />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-name">{t.fullName}</Label>
+            <Label htmlFor="admin-create-name" className="pb-2">{t.fullName}</Label>
             <Input id="admin-create-name" name="full_name" />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-avatar">{t.avatar}</Label>
+            <Label htmlFor="admin-create-avatar" className="pb-2">{t.avatar}</Label>
             <Input id="admin-create-avatar" name="avatar" type="url" placeholder={t.avatarPlaceholder} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-password">{t.password}</Label>
+            <Label htmlFor="admin-create-password" className="pb-2">{t.password}</Label>
             <Input id="admin-create-password" name="password" type="password" minLength={8} required />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-role">{t.role}</Label>
-            <select id="admin-create-role" name="role" defaultValue="user" className="h-8 w-full rounded-md border bg-background px-2 text-sm">
+            <Label htmlFor="admin-create-role" className="pb-2">{t.role}</Label>
+            <select id="admin-create-role" name="role" defaultValue="user" className={inputClassName}>
               {RoleTypeSchema.options.map((role) => <option key={role} value={role}>{role}</option>)}
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 pb-2 text-sm">
             <input name="is_active" type="checkbox" defaultChecked className="size-4" />
             {t.active}
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 pb-2 text-sm">
             <input name="is_superuser" type="checkbox" className="size-4" />
             {t.superuser}
           </label>
@@ -259,7 +262,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
                       </form>
                     </td>
                     <td className="px-3 py-3 align-top">
-                      <select name="role" form={`admin-user-${user.id}`} defaultValue={user.role} className="h-8 w-full rounded-md border bg-background px-2 text-sm">
+                      <select name="role" form={`admin-user-${user.id}`} defaultValue={user.role} className={inputClassName}>
                         {RoleTypeSchema.options.map((role) => <option key={role} value={role}>{role}</option>)}
                       </select>
                     </td>

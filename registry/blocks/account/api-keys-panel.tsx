@@ -79,6 +79,8 @@ const DEFAULT_LABELS: ApiKeysPanelLabels = {
 // Backend currently accepts whole-hour TTLs only; sub-hour units need an auth-API change.
 const TTL_UNIT_HOURS = { hours: 1, days: 24, weeks: 168 } as const;
 type TtlUnit = keyof typeof TTL_UNIT_HOURS;
+const inputClassName =
+  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40";
 
 export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> }) {
   const t = { ...DEFAULT_LABELS, ...labels };
@@ -121,7 +123,7 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
   };
 
   return (
-    <div className="space-y-6">
+    <div className="not-content space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>{t.createTitle}</CardTitle>
@@ -130,20 +132,20 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
         <CardContent>
           <form onSubmit={handleCreateToken} className="flex flex-wrap items-end gap-4">
             <div className="flex-1 min-w-[200px] space-y-1">
-              <Label htmlFor="name">{t.name}</Label>
+              <Label htmlFor="name" className="pb-2">{t.name}</Label>
               <Input id="name" name="name" placeholder={t.namePlaceholder} required />
             </div>
             <div className="w-24 space-y-1">
-              <Label htmlFor="ttl_amount">{t.ttl}</Label>
+              <Label htmlFor="ttl_amount" className="pb-2">{t.ttl}</Label>
               <Input id="ttl_amount" name="ttl_amount" type="number" min={1} defaultValue="30" required />
             </div>
             <div className="w-32 space-y-1">
-              <Label htmlFor="ttl_unit">{t.ttlUnit}</Label>
+              <Label htmlFor="ttl_unit" className="pb-2">{t.ttlUnit}</Label>
               <select
                 id="ttl_unit"
                 name="ttl_unit"
                 defaultValue="days"
-                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                className={inputClassName}
               >
                 <option value="hours">{t.unitHours}</option>
                 <option value="days">{t.unitDays}</option>

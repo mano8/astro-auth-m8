@@ -151,9 +151,9 @@ export function ProfilePanel({ labels }: { labels?: Partial<ProfilePanelLabels> 
   if (!user) return null;
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="not-content grid auto-rows-fr gap-6 md:grid-cols-2">
       {/* Profile metadata form */}
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <CardTitle>{t.title}</CardTitle>
           <CardDescription>{t.description}</CardDescription>
@@ -164,18 +164,18 @@ export function ProfilePanel({ labels }: { labels?: Partial<ProfilePanelLabels> 
             {errors.profileApi && <div className="p-2 text-sm text-destructive bg-destructive/10 rounded">{errors.profileApi}</div>}
 
             <div className="space-y-1">
-              <Label htmlFor="email">{t.email}</Label>
+              <Label htmlFor="email" className="pb-2">{t.email}</Label>
               <Input id="email" value={user.email} type="email" readOnly disabled aria-readonly="true" />
               <p className="text-xs text-muted-foreground">{t.emailReadOnly}</p>
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="full_name">{t.fullName}</Label>
+              <Label htmlFor="full_name" className="pb-2">{t.fullName}</Label>
               <Input id="full_name" name="full_name" defaultValue={user.full_name || ""} />
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="avatar">{t.avatar}</Label>
+              <Label htmlFor="avatar" className="pb-2">{t.avatar}</Label>
               <Input
                 id="avatar"
                 name="avatar"
@@ -194,7 +194,7 @@ export function ProfilePanel({ labels }: { labels?: Partial<ProfilePanelLabels> 
       </Card>
 
       {/* Password rotation (hidden for OAuth-provisioned accounts) */}
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <CardTitle>{t.passwordTitle}</CardTitle>
           <CardDescription>{t.passwordDescription}</CardDescription>
@@ -210,12 +210,12 @@ export function ProfilePanel({ labels }: { labels?: Partial<ProfilePanelLabels> 
               {errors.passApi && <div className="p-2 text-sm text-destructive bg-destructive/10 rounded">{errors.passApi}</div>}
 
               <div className="space-y-1">
-                <Label htmlFor="current_password">{t.currentPassword}</Label>
+                <Label htmlFor="current_password" className="pb-2">{t.currentPassword}</Label>
                 <Input id="current_password" name="current_password" type="password" required />
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="new_password">{t.newPassword}</Label>
+                <Label htmlFor="new_password" className="pb-2">{t.newPassword}</Label>
                 <Input id="new_password" name="new_password" type="password" required />
                 {errors.new_password && <p className="text-xs text-destructive">{errors.new_password}</p>}
               </div>

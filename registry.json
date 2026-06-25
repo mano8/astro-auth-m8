@@ -59,7 +59,7 @@
       "registryDependencies": [
         "button",
         "skeleton",
-        "tabs",
+        "navigation-menu",
         "./node_modules/@fa-m8/astro-auth-m8/registry/r/dashboard-overview.json"
       ],
       "files": [
