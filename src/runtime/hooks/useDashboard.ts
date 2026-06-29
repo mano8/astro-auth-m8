@@ -11,11 +11,12 @@ export function useDashboard(scope: "me" | "global" = "me", load = true) {
     enabled: load,
     staleTime: 30_000
   });
+  const { refetch } = activityQuery;
 
   const reload = useCallback(async () => {
-    const result = await activityQuery.refetch({ throwOnError: true });
+    const result = await refetch({ throwOnError: true });
     return result.data ?? null;
-  }, [activityQuery]);
+  }, [refetch]);
 
   const activity: UsersActivity | null = activityQuery.data ?? null;
   const loading = activityQuery.isLoading || activityQuery.isFetching;

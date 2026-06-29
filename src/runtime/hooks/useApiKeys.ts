@@ -14,11 +14,6 @@ export function useApiKeys(load = true) {
     staleTime: 30_000
   });
 
-  const reload = useCallback(async () => {
-    const result = await apiKeysQuery.refetch({ throwOnError: true });
-    return result.data ?? [];
-  }, [apiKeysQuery]);
-
   const createMutation = useMutation({
     mutationFn: createApiKey,
     onSuccess: async (key) => {
@@ -32,9 +27,17 @@ export function useApiKeys(load = true) {
       await queryClient.invalidateQueries({ queryKey: authKeys.apiKeys() });
     }
   });
+  const { refetch } = apiKeysQuery;
+  const { mutateAsync: createApiKeyAsync } = createMutation;
+  const { mutateAsync: revokeApiKeyAsync } = revokeMutation;
 
-  const create = useCallback((body: ApiKeyCreate) => createMutation.mutateAsync(body), [createMutation]);
-  const revoke = useCallback((id: string) => revokeMutation.mutateAsync(id), [revokeMutation]);
+  const reload = useCallback(async () => {
+    const result = await refetch({ throwOnError: true });
+    return result.data ?? [];
+  }, [refetch]);
+
+  const create = useCallback((body: ApiKeyCreate) => createApiKeyAsync(body), [createApiKeyAsync]);
+  const revoke = useCallback((id: string) => revokeApiKeyAsync(id), [revokeApiKeyAsync]);
 
   const apiKeys: ApiKeyPublic[] = apiKeysQuery.data ?? [];
   const loading = apiKeysQuery.isLoading || apiKeysQuery.isFetching;

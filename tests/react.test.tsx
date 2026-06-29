@@ -262,13 +262,24 @@ describe("hooks", () => {
     const client = createTestQueryClient();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
     const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useDashboard("me", false)} expose={(v) => { dash = v; }} /><HookProbe hook={() => useDashboard("global", false)} expose={(v) => { globalDash = v; }} /><HookProbe hook={() => useUsers(false)} expose={(v) => { usersHook = v; }} /><HookProbe hook={() => useSessions(false)} expose={(v) => { sessionsHook = v; }} /></HookHarnessWithClient>);
-    await act(async () => { await dash!.reload(); await globalDash!.reload(); await usersHook!.reload(); await sessionsHook!.reload(); });
+    const firstDashReload = dash!.reload;
+    const firstGlobalDashReload = globalDash!.reload;
+    const firstUsersReload = usersHook!.reload;
+    const firstSessionsReload = sessionsHook!.reload;
+    const firstCurrentSessionReload = sessionsHook!.reloadCurrent;
+    await act(async () => { await dash!.reload(); await globalDash!.reload(); await usersHook!.reload(); await sessionsHook!.reload(); await sessionsHook!.reloadCurrent(); });
     await waitFor(() => {
       expect(dash!.activity?.nb_users).toBe(1);
       expect(globalDash!.activity?.nb_users).toBe(2);
       expect(usersHook!.users?.count).toBe(1);
       expect(sessionsHook!.sessions?.count).toBe(0);
+      expect(sessionsHook!.current?.id).toBe("11111111-1111-4111-8111-111111111114");
     });
+    expect(dash!.reload).toBe(firstDashReload);
+    expect(globalDash!.reload).toBe(firstGlobalDashReload);
+    expect(usersHook!.reload).toBe(firstUsersReload);
+    expect(sessionsHook!.reload).toBe(firstSessionsReload);
+    expect(sessionsHook!.reloadCurrent).toBe(firstCurrentSessionReload);
     await act(async () => { await usersHook!.create({ provider: "password", email: "ada@example.com", password: "password1" }); });
     await act(async () => { await usersHook!.signup({ email: "ada@example.com", password: "password1" }); });
     await act(async () => { await usersHook!.get(user.id); });

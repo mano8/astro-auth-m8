@@ -13,11 +13,6 @@ export function useProfile(load = true) {
     staleTime: 30_000
   });
 
-  const reload = useCallback(async () => {
-    const result = await profileQuery.refetch({ throwOnError: true });
-    return result.data ?? null;
-  }, [profileQuery]);
-
   const saveMutation = useMutation({
     mutationFn: updateProfile,
     onSuccess: async (response) => {
@@ -33,10 +28,19 @@ export function useProfile(load = true) {
       queryClient.removeQueries({ queryKey: authKeys.profile(), exact: true });
     }
   });
+  const { refetch } = profileQuery;
+  const { mutateAsync: saveProfileAsync } = saveMutation;
+  const { mutateAsync: changePasswordAsync } = changePasswordMutation;
+  const { mutateAsync: removeProfileAsync } = removeMutation;
 
-  const save = useCallback((body: UserUpdateMe) => saveMutation.mutateAsync(body), [saveMutation]);
-  const changePassword = useCallback((body: UpdatePassword) => changePasswordMutation.mutateAsync(body), [changePasswordMutation]);
-  const remove = useCallback(() => removeMutation.mutateAsync(), [removeMutation]);
+  const reload = useCallback(async () => {
+    const result = await refetch({ throwOnError: true });
+    return result.data ?? null;
+  }, [refetch]);
+
+  const save = useCallback((body: UserUpdateMe) => saveProfileAsync(body), [saveProfileAsync]);
+  const changePassword = useCallback((body: UpdatePassword) => changePasswordAsync(body), [changePasswordAsync]);
+  const remove = useCallback(() => removeProfileAsync(), [removeProfileAsync]);
 
   const profile: UserPublic | null = profileQuery.data ?? null;
   const loading = profileQuery.isLoading || profileQuery.isFetching;

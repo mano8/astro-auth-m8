@@ -13,11 +13,6 @@ export function useUsers(load = true) {
     staleTime: 30_000
   });
 
-  const reload = useCallback(async () => {
-    const result = await usersQuery.refetch({ throwOnError: true });
-    return result.data ?? null;
-  }, [usersQuery]);
-
   const createMutation = useMutation({
     mutationFn: createUser,
     onSuccess: async (createdUser) => {
@@ -53,16 +48,26 @@ export function useUsers(load = true) {
       queryClient.removeQueries({ queryKey: authKeys.user(id), exact: true });
     }
   });
+  const { refetch } = usersQuery;
+  const { mutateAsync: createUserAsync } = createMutation;
+  const { mutateAsync: signupUserAsync } = signupMutation;
+  const { mutateAsync: updateUserAsync } = updateMutation;
+  const { mutateAsync: removeUserAsync } = removeMutation;
 
-  const create = useCallback((body: UserCreate) => createMutation.mutateAsync(body), [createMutation]);
-  const signup = useCallback((body: UserRegister) => signupMutation.mutateAsync(body), [signupMutation]);
+  const reload = useCallback(async () => {
+    const result = await refetch({ throwOnError: true });
+    return result.data ?? null;
+  }, [refetch]);
+
+  const create = useCallback((body: UserCreate) => createUserAsync(body), [createUserAsync]);
+  const signup = useCallback((body: UserRegister) => signupUserAsync(body), [signupUserAsync]);
   const get = useCallback((id: string) => queryClient.fetchQuery({
     queryKey: authKeys.user(id),
     queryFn: () => getUser(id),
     staleTime: 30_000
   }), [queryClient]);
-  const update = useCallback((id: string, body: UserUpdate) => updateMutation.mutateAsync({ id, body }), [updateMutation]);
-  const remove = useCallback((id: string) => removeMutation.mutateAsync(id), [removeMutation]);
+  const update = useCallback((id: string, body: UserUpdate) => updateUserAsync({ id, body }), [updateUserAsync]);
+  const remove = useCallback((id: string) => removeUserAsync(id), [removeUserAsync]);
 
   const users: UsersPublic | null = usersQuery.data ?? null;
   const loading = usersQuery.isLoading || usersQuery.isFetching;

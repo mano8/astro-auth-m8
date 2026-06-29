@@ -20,25 +20,27 @@ export function useSessions(load = true) {
     enabled: false,
     staleTime: 30_000
   });
-
-  const reload = useCallback(async () => {
-    const result = await sessionsQuery.refetch({ throwOnError: true });
-    return result.data ?? null;
-  }, [sessionsQuery]);
-
-  const reloadCurrent = useCallback(async () => {
-    const result = await currentQuery.refetch({ throwOnError: true });
-    return result.data ?? null;
-  }, [currentQuery]);
-
   const revokeMutation = useMutation({
     mutationFn: revokeSession,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: authKeys.sessions() });
     }
   });
+  const { refetch: refetchSessions } = sessionsQuery;
+  const { refetch: refetchCurrent } = currentQuery;
+  const { mutateAsync: revokeSessionAsync } = revokeMutation;
 
-  const revoke = useCallback((id: string) => revokeMutation.mutateAsync(id), [revokeMutation]);
+  const reload = useCallback(async () => {
+    const result = await refetchSessions({ throwOnError: true });
+    return result.data ?? null;
+  }, [refetchSessions]);
+
+  const reloadCurrent = useCallback(async () => {
+    const result = await refetchCurrent({ throwOnError: true });
+    return result.data ?? null;
+  }, [refetchCurrent]);
+
+  const revoke = useCallback((id: string) => revokeSessionAsync(id), [revokeSessionAsync]);
 
   const sessions: ClientSessionsPublic | null = sessionsQuery.data ?? null;
   const current: ClientSessionPublic | null = currentQuery.data ?? null;
