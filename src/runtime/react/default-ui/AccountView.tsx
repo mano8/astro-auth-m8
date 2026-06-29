@@ -1,14 +1,23 @@
+import type { ReactNode } from "react";
 import { useProfile } from "../../hooks/useProfile.js";
 import { useAuth } from "../AuthProvider.js";
+
+function AccountPanelMessage({ children, role }: { children: ReactNode; role?: "alert" | "status" }) {
+  return (
+    <section className="not-content fa-auth-panel">
+      <p role={role}>{children}</p>
+    </section>
+  );
+}
 
 export function AccountView() {
   const { user, logout } = useAuth();
   const { profile, loading, error } = useProfile(!user);
   const value = user ?? profile;
 
-  if (loading) return <p>Loading account</p>;
-  if (error) return <p role="alert">Unable to load account</p>;
-  if (!value) return <p>Please sign in to view your account.</p>;
+  if (loading) return <AccountPanelMessage role="status">Loading account</AccountPanelMessage>;
+  if (error) return <AccountPanelMessage role="alert">Unable to load account</AccountPanelMessage>;
+  if (!value) return <AccountPanelMessage>Please sign in to view your account.</AccountPanelMessage>;
 
   return (
     <section className="not-content fa-auth-panel">

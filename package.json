@@ -1,5 +1,5 @@
 {
-  "name": "@fa-m8/astro-auth-m8",
+  "name": "@mano8/astro-auth-m8",
   "version": "0.1.0-alpha.1",
   "description": "Astro integration and headless client for fa-auth-m8.",
   "type": "module",
@@ -27,7 +27,7 @@
     "LICENSE"
   ],
   "bin": {
-    "astro-auth-m8": "./dist/bin/astro-auth-m8.js"
+    "astro-auth-m8": "dist/bin/astro-auth-m8.js"
   },
   "exports": {
     ".": "./dist/src/integration.js",

@@ -313,6 +313,7 @@ describe("hooks", () => {
 describe("default UI", () => {
   it("renders login success, Google, signup link, and error states", async () => {
     const view = render(<AuthProvider bootstrap={false}><LoginView signupHref="/signup" googleEnabled onGoogle={vi.fn()} /></AuthProvider>);
+    expect(view.container.querySelector(".fa-auth-panel")).not.toBeNull();
     const [email, password] = Array.from(view.container.querySelectorAll("input"));
     act(() => {
       email.value = "ada@example.com";
@@ -331,16 +332,19 @@ describe("default UI", () => {
   it("renders account states and logout", async () => {
     let view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
     await waitFor(() => expect(view.container.textContent).toContain("ada@example.com"));
+    expect(view.container.querySelector(".fa-auth-panel dl")).not.toBeNull();
     await act(async () => { view.container.querySelector("button")!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
     view.unmount();
     profileApi.getProfile.mockRejectedValueOnce(new Error("profile failed"));
     view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
     await waitFor(() => expect(view.container.textContent).toContain("Unable to load account"));
+    expect(view.container.querySelector(".fa-auth-panel [role='alert']")).not.toBeNull();
     view.unmount();
   });
 
   it("renders callback success, missing state, and failure states", async () => {
     let view = render(<CallbackView />);
+    expect(view.container.querySelector(".fa-auth-panel [role='status']")?.textContent).toContain("Completing sign in");
     await flush();
     expect(window.location.assign).toHaveBeenCalledWith("../user/account");
     view.unmount();
@@ -348,17 +352,20 @@ describe("default UI", () => {
     view = render(<CallbackView />);
     await flush();
     expect(view.container.textContent).toContain("missing required state");
+    expect(view.container.querySelector(".fa-auth-panel [role='alert']")).not.toBeNull();
     view.unmount();
     oauthApi.exchangeGoogleCode.mockRejectedValueOnce(new Error("exchange failed"));
     view = render(<CallbackView />);
     await flush();
     expect(view.container.textContent).toContain("Unable to complete OAuth sign in");
+    expect(view.container.querySelector(".fa-auth-panel [role='alert']")).not.toBeNull();
     view.unmount();
   });
 
   it("renders signup placeholder", () => {
     const view = render(<SignupView />);
     expect(view.container.textContent).toContain("Signup unavailable");
+    expect(view.container.querySelector(".fa-auth-panel")).not.toBeNull();
     view.unmount();
   });
 });

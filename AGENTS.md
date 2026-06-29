@@ -26,6 +26,7 @@ shadcn registry skins usable by `fa-ui-m8`.
 - The account landing view is a dashboard; profile, sessions, API keys, and admin
   panels are secondary surfaces.
 - Consumers own secrets, env, i18n labels, and final composition.
+- Views must be adaptative, mobile first and modern
 
 ## Commands
 

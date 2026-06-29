@@ -1,5 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import faAuth, { buildAuthRoutes } from "../src/integration.js";
+
+const testDir = dirname(fileURLToPath(import.meta.url));
+const authRouteNames = ["account", "callback", "login", "logout", "signup"] as const;
 
 describe("Astro integration", () => {
   it("is headless by default and wires config", () => {
@@ -86,5 +92,14 @@ describe("Astro integration", () => {
     const define = updateConfig.mock.calls[0][0].vite.define as Record<string, string>;
     const policy = JSON.parse(define["import.meta.env.PUBLIC_FA_AUTH_CSP_POLICY"] as string) as string;
     expect(policy).toContain("https://media.example.com");
+  });
+
+  it("inlines starter route styles so client page changes keep formatting", () => {
+    for (const routeName of authRouteNames) {
+      const source = readFileSync(resolve(testDir, `../src/routes/${routeName}.astro`), "utf8");
+      expect(source).toContain('import AuthStyles from "./_AuthStyles.astro"');
+      expect(source).toContain("<AuthStyles />");
+      expect(source).not.toContain('import "../scaffold/styles/auth.css"');
+    }
   });
 });
