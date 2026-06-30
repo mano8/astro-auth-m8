@@ -39,11 +39,11 @@ export type FaAuthAstroOptions = {
 };
 
 const ROUTE_ENTRYPOINTS = {
-  login: "@fa-m8/astro-auth-m8/routes/login.astro",
-  signup: "@fa-m8/astro-auth-m8/routes/signup.astro",
-  logout: "@fa-m8/astro-auth-m8/routes/logout.astro",
-  callback: "@fa-m8/astro-auth-m8/routes/callback.astro",
-  account: "@fa-m8/astro-auth-m8/routes/account.astro"
+  login: "@mano8/astro-auth-m8/routes/login.astro",
+  signup: "@mano8/astro-auth-m8/routes/signup.astro",
+  logout: "@mano8/astro-auth-m8/routes/logout.astro",
+  callback: "@mano8/astro-auth-m8/routes/callback.astro",
+  account: "@mano8/astro-auth-m8/routes/account.astro"
 } as const;
 
 export default function faAuth(options: FaAuthAstroOptions = {}): AstroIntegration {
@@ -58,7 +58,7 @@ export default function faAuth(options: FaAuthAstroOptions = {}): AstroIntegrati
     : "";
 
   return {
-    name: "@fa-m8/astro-auth-m8",
+    name: "@mano8/astro-auth-m8",
     hooks: {
       "astro:config:setup": ({ injectRoute, addMiddleware, updateConfig }) => {
         updateConfig({
@@ -85,7 +85,7 @@ export default function faAuth(options: FaAuthAstroOptions = {}): AstroIntegrati
         if (options.guards?.middleware) {
           addMiddleware({
             order: "pre",
-            entrypoint: "@fa-m8/astro-auth-m8/middleware"
+            entrypoint: "@mano8/astro-auth-m8/middleware"
           });
         }
       }

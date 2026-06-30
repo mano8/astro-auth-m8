@@ -1,15 +1,15 @@
 "use client";
 
 // fa-auth profile panel: edit public profile metadata + rotate password.
-// Headless logic stays a live dependency — `useAuth` (@fa-m8/astro-auth-m8/react)
-// supplies the signed-in user + reload, `useProfile` (@fa-m8/astro-auth-m8/hooks)
+// Headless logic stays a live dependency — `useAuth` (@mano8/astro-auth-m8/react)
+// supplies the signed-in user + reload, `useProfile` (@mano8/astro-auth-m8/hooks)
 // performs the writes, and the package Zod schemas validate the form. This file
 // is only the shadcn skin and is copied into the consumer via the @fa-m8-auth
 // registry — edit (and translate via `labels`) freely per app.
 import * as React from "react";
-import { useAuth } from "@fa-m8/astro-auth-m8/react";
-import { useProfile } from "@fa-m8/astro-auth-m8/hooks";
-import { UserUpdateMeSchema, UpdatePasswordSchema } from "@fa-m8/astro-auth-m8/schemas";
+import { useAuth } from "@mano8/astro-auth-m8/react";
+import { useProfile } from "@mano8/astro-auth-m8/hooks";
+import { UserUpdateMeSchema, UpdatePasswordSchema } from "@mano8/astro-auth-m8/schemas";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -2,15 +2,15 @@
 
 // fa-auth admin users panel: superuser-only user management (create / update /
 // delete). Headless logic stays a live dependency — `useUsers`
-// (@fa-m8/astro-auth-m8/hooks) owns the API calls, the package Zod schemas
+// (@mano8/astro-auth-m8/hooks) owns the API calls, the package Zod schemas
 // validate the forms, and the package's `RequireRole superuser` gates the whole
 // panel. This file is only the shadcn skin, copied into the consumer via the
 // @fa-m8-auth registry — edit (and translate via `labels`) freely per app.
 import * as React from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
-import { RequireRole } from "@fa-m8/astro-auth-m8/react";
-import { useUsers } from "@fa-m8/astro-auth-m8/hooks";
-import { RoleTypeSchema, UserCreateSchema, UserUpdateSchema } from "@fa-m8/astro-auth-m8/schemas";
+import { RequireRole } from "@mano8/astro-auth-m8/react";
+import { useUsers } from "@mano8/astro-auth-m8/hooks";
+import { RoleTypeSchema, UserCreateSchema, UserUpdateSchema } from "@mano8/astro-auth-m8/schemas";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

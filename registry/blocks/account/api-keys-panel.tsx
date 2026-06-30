@@ -1,13 +1,13 @@
 "use client";
 
 // fa-auth API keys panel: mint and revoke programmatic API tokens. Headless
-// logic stays a live dependency — `useApiKeys` (@fa-m8/astro-auth-m8/hooks) owns
+// logic stays a live dependency — `useApiKeys` (@mano8/astro-auth-m8/hooks) owns
 // the list/create/revoke calls and the package Zod schema validates the form.
 // This file is only the shadcn skin, copied into the consumer via the
 // @fa-m8-auth registry — edit (and translate via `labels`) freely per app.
 import * as React from "react";
-import { useApiKeys } from "@fa-m8/astro-auth-m8/hooks";
-import { ApiKeyCreateSchema } from "@fa-m8/astro-auth-m8/schemas";
+import { useApiKeys } from "@mano8/astro-auth-m8/hooks";
+import { ApiKeyCreateSchema } from "@mano8/astro-auth-m8/schemas";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

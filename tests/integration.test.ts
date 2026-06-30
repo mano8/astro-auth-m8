@@ -14,7 +14,7 @@ describe("Astro integration", () => {
     const addMiddleware = vi.fn();
     const updateConfig = vi.fn();
     integration.hooks["astro:config:setup"]?.({ injectRoute, addMiddleware, updateConfig } as never);
-    expect(integration.name).toBe("@fa-m8/astro-auth-m8");
+    expect(integration.name).toBe("@mano8/astro-auth-m8");
     expect(injectRoute).not.toHaveBeenCalled();
     expect(addMiddleware).not.toHaveBeenCalled();
     expect(updateConfig).toHaveBeenCalledWith(expect.objectContaining({ vite: expect.any(Object) }));
@@ -27,8 +27,8 @@ describe("Astro integration", () => {
     const updateConfig = vi.fn();
     integration.hooks["astro:config:setup"]?.({ injectRoute, addMiddleware, updateConfig } as never);
     expect(injectRoute).toHaveBeenCalledTimes(5);
-    expect(injectRoute).toHaveBeenCalledWith({ pattern: "/[locale]/auth/login", entrypoint: "@fa-m8/astro-auth-m8/routes/login.astro" });
-    expect(addMiddleware).toHaveBeenCalledWith({ order: "pre", entrypoint: "@fa-m8/astro-auth-m8/middleware" });
+    expect(injectRoute).toHaveBeenCalledWith({ pattern: "/[locale]/auth/login", entrypoint: "@mano8/astro-auth-m8/routes/login.astro" });
+    expect(addMiddleware).toHaveBeenCalledWith({ order: "pre", entrypoint: "@mano8/astro-auth-m8/middleware" });
   });
 
   it("skips disabled starter routes", () => {

@@ -1,6 +1,6 @@
 ---
-import { AuthProvider } from "@fa-m8/astro-auth-m8/react";
-import { logout } from "@fa-m8/astro-auth-m8/client";
+import { AuthProvider } from "@mano8/astro-auth-m8/react";
+import { logout } from "@mano8/astro-auth-m8/client";
 import AuthStyles from "./_AuthStyles.astro";
 ---
 <AuthStyles />
@@ -11,7 +11,7 @@ import AuthStyles from "./_AuthStyles.astro";
   </form>
 </AuthProvider>
 <script>
-  import { logout } from "@fa-m8/astro-auth-m8/client";
+  import { logout } from "@mano8/astro-auth-m8/client";
   document.getElementById("fa-auth-logout")?.addEventListener("click", async () => {
     await logout();
     window.location.assign("../auth/login");

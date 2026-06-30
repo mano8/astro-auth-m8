@@ -1,7 +1,7 @@
 "use client";
 
 // fa-auth account view whose FIRST/landing tab is the activity dashboard.
-// Headless auth state comes from the package (@fa-m8/astro-auth-m8/react); this
+// Headless auth state comes from the package (@mano8/astro-auth-m8/react); this
 // file is only the shadcn skin and is copied into the consumer via the
 // @fa-m8-auth registry. Secondary tabs (profile/sessions/api-keys/admin) are
 // passed in by the consumer via `extraTabs`, so locale + app-specific panels
@@ -12,7 +12,7 @@ import {
   AuthProvider,
   useAuth,
   type AuthContextValue,
-} from "@fa-m8/astro-auth-m8/react";
+} from "@mano8/astro-auth-m8/react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -2,15 +2,15 @@
 
 // fa-auth sessions panel: current session details + your/all activity summaries,
 // with superuser-only session revocation. Headless logic stays a live dependency
-// — `useAuth` (@fa-m8/astro-auth-m8/react) supplies the user, `useSessions` and
-// `useDashboard` (@fa-m8/astro-auth-m8/hooks) supply the data. This file is only
+// — `useAuth` (@mano8/astro-auth-m8/react) supplies the user, `useSessions` and
+// `useDashboard` (@mano8/astro-auth-m8/hooks) supply the data. This file is only
 // the shadcn skin, copied into the consumer via the @fa-m8-auth registry — edit
 // (and translate via `labels`) freely per app.
 import * as React from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
-import { useAuth } from "@fa-m8/astro-auth-m8/react";
-import { useSessions, useDashboard } from "@fa-m8/astro-auth-m8/hooks";
-import type { UsersActivity } from "@fa-m8/astro-auth-m8/schemas";
+import { useAuth } from "@mano8/astro-auth-m8/react";
+import { useSessions, useDashboard } from "@mano8/astro-auth-m8/hooks";
+import type { UsersActivity } from "@mano8/astro-auth-m8/schemas";
 
 import { Button } from "@/components/ui/button";
 import {

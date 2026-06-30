@@ -2,11 +2,11 @@
 
 // fa-auth account landing view: an activity dashboard built from the package's
 // headless `useDashboard` hook. Logic stays a live dependency
-// (@fa-m8/astro-auth-m8/hooks); this file is only the shadcn skin and is copied
+// (@mano8/astro-auth-m8/hooks); this file is only the shadcn skin and is copied
 // into the consumer via the @fa-m8-auth registry — edit freely per app.
 import * as React from "react";
 import { Activity, TrendingUp, Users } from "lucide-react";
-import { useDashboard } from "@fa-m8/astro-auth-m8/hooks";
+import { useDashboard } from "@mano8/astro-auth-m8/hooks";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
