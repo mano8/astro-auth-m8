@@ -11,60 +11,60 @@ import {
 
 describe("fa-auth-m8 compatibility contract", () => {
   it("exports the tested contract metadata", () => {
-    expect(FA_AUTH_M8_CONTRACT).toBe("fa-auth-m8@0.9");
-    expect(FA_AUTH_M8_CONTRACT_VERSION).toBe("0.9");
-    expect(FA_AUTH_M8_TESTED_SERVICE_VERSION).toBe("0.9.8");
-    expect(FA_AUTH_M8_SERVICE_VERSION_RANGE).toBe(">=0.9.8 <0.10.0");
+    expect(FA_AUTH_M8_CONTRACT).toBe("fa-auth-m8@1.0");
+    expect(FA_AUTH_M8_CONTRACT_VERSION).toBe("1.0");
+    expect(FA_AUTH_M8_TESTED_SERVICE_VERSION).toBe("1.0.0");
+    expect(FA_AUTH_M8_SERVICE_VERSION_RANGE).toBe(">=1.0.0 <1.1.0");
   });
 
   it("checks service version ranges", () => {
-    expect(isFaAuthM8ServiceVersionCompatible("0.9.8")).toBe(true);
-    expect(isFaAuthM8ServiceVersionCompatible("0.9.9+build.1")).toBe(true);
-    expect(isFaAuthM8ServiceVersionCompatible("0.9.7")).toBe(false);
+    expect(isFaAuthM8ServiceVersionCompatible("1.0.0")).toBe(true);
+    expect(isFaAuthM8ServiceVersionCompatible("1.0.1+build.1")).toBe(true);
+    expect(isFaAuthM8ServiceVersionCompatible("0.9.9")).toBe(false);
     expect(isFaAuthM8ServiceVersionCompatible("0.8.9")).toBe(false);
-    expect(isFaAuthM8ServiceVersionCompatible("0.10.0")).toBe(false);
+    expect(isFaAuthM8ServiceVersionCompatible("1.1.0")).toBe(false);
     expect(isFaAuthM8ServiceVersionCompatible("not-semver")).toBe(false);
   });
 
   it("accepts matching contract or service metadata", () => {
-    expect(getFaAuthM8Compatibility({ auth_contract_version: "0.9" })).toMatchObject({ status: "compatible", contractVersion: "0.9" });
-    expect(getFaAuthM8Compatibility({ contract_version: "fa-auth-m8@0.9" })).toMatchObject({ status: "compatible", contractVersion: "fa-auth-m8@0.9" });
-    expect(getFaAuthM8Compatibility({ fa_auth_m8_version: "0.9.8" })).toMatchObject({ status: "compatible", serviceVersion: "0.9.8" });
-    expect(getFaAuthM8Compatibility({ service_version: "0.9.9" })).toMatchObject({ status: "compatible", serviceVersion: "0.9.9" });
-    expect(getFaAuthM8Compatibility({ version: "0.9.8" })).toMatchObject({ status: "compatible", serviceVersion: "0.9.8" });
+    expect(getFaAuthM8Compatibility({ auth_contract_version: "1.0" })).toMatchObject({ status: "compatible", contractVersion: "1.0" });
+    expect(getFaAuthM8Compatibility({ contract_version: "fa-auth-m8@1.0" })).toMatchObject({ status: "compatible", contractVersion: "fa-auth-m8@1.0" });
+    expect(getFaAuthM8Compatibility({ fa_auth_m8_version: "1.0.0" })).toMatchObject({ status: "compatible", serviceVersion: "1.0.0" });
+    expect(getFaAuthM8Compatibility({ service_version: "1.0.1" })).toMatchObject({ status: "compatible", serviceVersion: "1.0.1" });
+    expect(getFaAuthM8Compatibility({ version: "1.0.0" })).toMatchObject({ status: "compatible", serviceVersion: "1.0.0" });
   });
 
   it("reads the GET /meta payload shape (nested contract + version)", () => {
     const meta = {
       service: "fa-auth-m8",
-      version: "0.9.8",
+      version: "1.0.0",
       api_version: "v1",
-      contract: { name: "fa-auth-m8", version: "0.9", range: ">=0.9.8 <0.10.0" }
+      contract: { name: "fa-auth-m8", version: "1.0", range: ">=1.0.0 <1.1.0" }
     };
     expect(getFaAuthM8Compatibility(meta)).toMatchObject({
       status: "compatible",
-      contractVersion: "0.9",
-      serviceVersion: "0.9.8"
+      contractVersion: "1.0",
+      serviceVersion: "1.0.0"
     });
     // A nested contract whose version mismatches is rejected.
     expect(
-      getFaAuthM8Compatibility({ version: "0.9.8", contract: { version: "0.10" } })
-    ).toMatchObject({ status: "incompatible", contractVersion: "0.10" });
+      getFaAuthM8Compatibility({ version: "1.0.0", contract: { version: "1.1" } })
+    ).toMatchObject({ status: "incompatible", contractVersion: "1.1" });
   });
 
   it("rejects mismatched contract and service metadata", () => {
     expect(getFaAuthM8Compatibility({ auth_contract: "0.8" })).toMatchObject({ status: "incompatible", contractVersion: "0.8" });
-    expect(getFaAuthM8Compatibility({ contract: "fa-auth-m8@0.10" })).toMatchObject({ status: "incompatible", contractVersion: "fa-auth-m8@0.10" });
-    expect(getFaAuthM8Compatibility({ fa_auth_m8_contract: "0.10" })).toMatchObject({ status: "incompatible", contractVersion: "0.10" });
-    expect(getFaAuthM8Compatibility({ service_version: "0.10.0" })).toMatchObject({ status: "incompatible", serviceVersion: "0.10.0" });
+    expect(getFaAuthM8Compatibility({ contract: "fa-auth-m8@1.1" })).toMatchObject({ status: "incompatible", contractVersion: "fa-auth-m8@1.1" });
+    expect(getFaAuthM8Compatibility({ fa_auth_m8_contract: "1.1" })).toMatchObject({ status: "incompatible", contractVersion: "1.1" });
+    expect(getFaAuthM8Compatibility({ service_version: "1.1.0" })).toMatchObject({ status: "incompatible", serviceVersion: "1.1.0" });
   });
 
   it("reports unknown metadata and asserts based on policy", () => {
     expect(getFaAuthM8Compatibility({})).toMatchObject({ status: "unknown" });
     expect(() => assertFaAuthM8Compatibility({})).toThrow("No fa-auth-m8 contract or service version metadata was provided");
     expect(assertFaAuthM8Compatibility({}, false)).toMatchObject({ status: "unknown" });
-    expect(assertFaAuthM8Compatibility({ service_version: "0.9.8" })).toMatchObject({ status: "compatible" });
-    expect(() => assertFaAuthM8Compatibility({ service_version: "0.10.0" })).toThrow("Expected fa-auth-m8 service version");
-    expect(() => assertFaAuthM8Compatibility({ auth_contract_version: "0.8" })).toThrow("Expected fa-auth-m8@0.9");
+    expect(assertFaAuthM8Compatibility({ service_version: "1.0.0" })).toMatchObject({ status: "compatible" });
+    expect(() => assertFaAuthM8Compatibility({ service_version: "1.1.0" })).toThrow("Expected fa-auth-m8 service version");
+    expect(() => assertFaAuthM8Compatibility({ auth_contract_version: "0.8" })).toThrow("Expected fa-auth-m8@1.0");
   });
 });

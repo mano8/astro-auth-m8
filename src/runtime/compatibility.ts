@@ -1,11 +1,10 @@
 export const FA_AUTH_M8_CONTRACT_ID = "fa-auth-m8";
-export const FA_AUTH_M8_CONTRACT_VERSION = "0.9";
+export const FA_AUTH_M8_CONTRACT_VERSION = "1.0";
 export const FA_AUTH_M8_CONTRACT = `${FA_AUTH_M8_CONTRACT_ID}@${FA_AUTH_M8_CONTRACT_VERSION}` as const;
-// 0.9.8 is the first fa-auth-m8 release exposing GET {API_PREFIX}/meta; earlier
-// 0.9.x have no discovery route for this plugin to read.
-export const FA_AUTH_M8_TESTED_SERVICE_VERSION = "0.9.8";
-export const FA_AUTH_M8_MIN_SERVICE_VERSION = "0.9.8";
-export const FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE = "0.10.0";
+// 1.0.0 is the supported fa-auth-m8 service baseline for this plugin.
+export const FA_AUTH_M8_TESTED_SERVICE_VERSION = "1.0.0";
+export const FA_AUTH_M8_MIN_SERVICE_VERSION = "1.0.0";
+export const FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE = "1.1.0";
 export const FA_AUTH_M8_SERVICE_VERSION_RANGE = `>=${FA_AUTH_M8_MIN_SERVICE_VERSION} <${FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE}`;
 
 export type FaAuthM8CompatibilityStatus = "compatible" | "incompatible" | "unknown";

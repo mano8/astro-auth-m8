@@ -75,8 +75,8 @@
     "esbuild": "^0.28.1"
   },
   "faAuthM8": {
-    "contract": "fa-auth-m8@0.9",
-    "testedServiceVersion": "0.9.8",
-    "serviceVersionRange": ">=0.9.8 <0.10.0"
+    "contract": "fa-auth-m8@1.0",
+    "testedServiceVersion": "1.0.0",
+    "serviceVersionRange": ">=1.0.0 <1.1.0"
   }
 }
