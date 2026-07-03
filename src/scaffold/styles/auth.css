@@ -1,0 +1,49 @@
+.fa-auth-panel {
+  width: min(100% - 32px, 420px);
+  margin: 64px auto;
+  font-family: system-ui, sans-serif;
+}
+
+.fa-auth-panel h1 {
+  margin: 0 0 24px;
+  font-size: 1.75rem;
+}
+
+.fa-auth-panel form,
+.fa-auth-panel label,
+.fa-auth-panel dl {
+  display: grid;
+  gap: 12px;
+}
+
+.fa-auth-panel label {
+  padding-bottom: 0.5rem;
+}
+
+.fa-auth-panel input,
+.fa-auth-panel select,
+.fa-auth-panel button {
+  min-height: 40px;
+  font: inherit;
+}
+
+.fa-auth-panel select {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] .fa-auth-panel select {
+  color-scheme: dark;
+}
+
+.fa-auth-panel select option {
+  background-color: var(--popover, Canvas);
+  color: var(--popover-foreground, CanvasText);
+}
+
+.fa-auth-panel button {
+  cursor: pointer;
+}
+
+.fa-auth-panel [role="alert"] {
+  color: #9f1239;
+}

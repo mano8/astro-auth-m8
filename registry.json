@@ -1,0 +1,132 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "fa-m8-auth",
+  "homepage": "https://github.com/mano8/astro-auth-m8",
+  "items": [
+    {
+      "name": "data-table",
+      "type": "registry:component",
+      "title": "Data Table",
+      "description": "Generic pure-shadcn data table (sorting, filtering, pagination) built on @tanstack/react-table.",
+      "dependencies": ["@tanstack/react-table"],
+      "registryDependencies": ["table", "button", "input"],
+      "files": [
+        {
+          "path": "registry/blocks/data-table/data-table.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/data-table.tsx"
+        }
+      ]
+    },
+    {
+      "name": "activity-bar-chart",
+      "type": "registry:component",
+      "title": "Activity Bar Chart",
+      "description": "shadcn chart preset (recharts) for fa-auth per-model added/updated activity.",
+      "dependencies": ["recharts"],
+      "registryDependencies": ["chart"],
+      "files": [
+        {
+          "path": "registry/blocks/chart/activity-bar-chart.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/activity-bar-chart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "dashboard-overview",
+      "type": "registry:component",
+      "title": "Account Dashboard Overview",
+      "description": "fa-auth activity dashboard (stat cards + chart) driven by the package's useDashboard hook. Requires @mano8/astro-auth-m8 installed.",
+      "registryDependencies": [
+        "card",
+        "skeleton",
+        "./node_modules/@mano8/astro-auth-m8/registry/r/activity-bar-chart.json"
+      ],
+      "files": [
+        {
+          "path": "registry/blocks/account/dashboard-overview.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/dashboard-overview.tsx"
+        }
+      ]
+    },
+    {
+      "name": "account-dashboard",
+      "type": "registry:component",
+      "title": "Account Dashboard",
+      "description": "fa-auth account view whose first/landing tab is the activity dashboard; secondary tabs are wired by the consumer. Requires @mano8/astro-auth-m8 installed.",
+      "registryDependencies": [
+        "button",
+        "skeleton",
+        "navigation-menu",
+        "./node_modules/@mano8/astro-auth-m8/registry/r/dashboard-overview.json"
+      ],
+      "files": [
+        {
+          "path": "registry/blocks/account/account-dashboard.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/account-dashboard.tsx"
+        }
+      ]
+    },
+    {
+      "name": "profile-panel",
+      "type": "registry:component",
+      "title": "Account Profile Panel",
+      "description": "fa-auth profile editor (metadata + password rotation) driven by the package's useAuth + useProfile hooks. Requires @mano8/astro-auth-m8 installed.",
+      "registryDependencies": ["card", "button", "input", "label"],
+      "files": [
+        {
+          "path": "registry/blocks/account/profile-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/profile-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sessions-panel",
+      "type": "registry:component",
+      "title": "Account Sessions Panel",
+      "description": "fa-auth session details + activity summaries with superuser-only session revocation, driven by the package's useSessions + useDashboard hooks. Requires @mano8/astro-auth-m8 installed.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["card", "button"],
+      "files": [
+        {
+          "path": "registry/blocks/account/sessions-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/sessions-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "api-keys-panel",
+      "type": "registry:component",
+      "title": "Account API Keys Panel",
+      "description": "fa-auth API token mint/revoke panel driven by the package's useApiKeys hook. Requires @mano8/astro-auth-m8 installed.",
+      "registryDependencies": ["card", "button", "input", "label"],
+      "files": [
+        {
+          "path": "registry/blocks/account/api-keys-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/api-keys-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "admin-users-panel",
+      "type": "registry:component",
+      "title": "Admin Users Panel",
+      "description": "fa-auth superuser-only user management (create/update/delete), gated by the package's RequireRole and driven by useUsers. Requires @mano8/astro-auth-m8 installed.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["card", "button", "input", "label"],
+      "files": [
+        {
+          "path": "registry/blocks/account/admin-users-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/admin-users-panel.tsx"
+        }
+      ]
+    }
+  ]
+}

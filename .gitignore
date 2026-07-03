@@ -83,6 +83,10 @@ out
 dist
 .output
 
+# Generated shadcn registry output (built from registry.json by
+# `npm run build:registry`; shipped via package `files`, not committed).
+registry/r/
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js
@@ -141,3 +145,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Claude
+CLAUDE.md
+.claude/
