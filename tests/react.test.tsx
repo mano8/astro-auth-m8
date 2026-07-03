@@ -30,6 +30,7 @@ import { useProfile } from "../src/runtime/hooks/useProfile.js";
 import { useSessions } from "../src/runtime/hooks/useSessions.js";
 import { useUsers } from "../src/runtime/hooks/useUsers.js";
 import { authKeys } from "../src/runtime/queryKeys.js";
+import { getAuthConfig, resetAuthConfig } from "../src/runtime/config.js";
 
 const user = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -107,6 +108,7 @@ function QueryClientProbe({ expose }: { expose: (client: QueryClient) => void })
 }
 
 beforeEach(() => {
+  resetAuthConfig();
   vi.clearAllMocks();
   authApi.login.mockResolvedValue({ access_token: "token", token_type: "bearer" });
   authApi.logout.mockResolvedValue({ message: "bye" });
@@ -141,6 +143,24 @@ afterEach(() => {
 });
 
 describe("AuthProvider and guards", () => {
+  it("applies runtime config before children bootstrap or render", () => {
+    let apiBaseDuringChildRender = "";
+
+    function ConfigProbe() {
+      apiBaseDuringChildRender = getAuthConfig().apiBase;
+      return null;
+    }
+
+    const view = render(
+      <AuthProvider config={{ apiBase: "/session-api" }} bootstrap={false}>
+        <ConfigProbe />
+      </AuthProvider>
+    );
+
+    expect(apiBaseDuringChildRender).toBe("/session-api");
+    view.unmount();
+  });
+
   it("creates one stable query client and supports injected or parent-owned clients", async () => {
     const seenClients: QueryClient[] = [];
     const customClient = new QueryClient();

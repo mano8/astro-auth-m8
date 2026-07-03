@@ -29,6 +29,20 @@ export function authUrl(path: string): string {
   return url.toString();
 }
 
+async function errorDetailFromResponse(response: Response): Promise<unknown> {
+  try {
+    return normalizeFastApiError(await response.clone().json());
+  } catch {
+    const detail = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
+    const normalized = detail.trim().toLowerCase();
+    if (contentType.includes("text/html") || normalized.startsWith("<!doctype html") || normalized.startsWith("<html")) {
+      return `Auth API returned HTML for ${response.status}. Check PUBLIC_AUTH_API_BASE and backend routing.`;
+    }
+    return detail;
+  }
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   const config = getAuthConfig();
   const response = await fetch(authUrl(config.refreshPath), {
@@ -93,13 +107,7 @@ export async function request<T>(options: RequestOptions<T>): Promise<T> {
       setToken(null);
       throw new UnauthenticatedError();
     }
-    let detail: unknown;
-    try {
-      detail = normalizeFastApiError(await response.clone().json());
-    } catch {
-      detail = await response.text();
-    }
-    throw new ApiError(response.status, detail);
+    throw new ApiError(response.status, await errorDetailFromResponse(response));
   }
 
   if (response.status === 204) return undefined as T;

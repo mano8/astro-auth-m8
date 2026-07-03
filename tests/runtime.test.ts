@@ -163,6 +163,15 @@ describe("client", () => {
     await expect(request({ method: "GET", path: "/bad", skipRefresh: true, schema: MessageSchema })).rejects.toMatchObject({ status: 400, detail: "bad" });
     vi.stubGlobal("fetch", vi.fn(async () => new Response("plain", { status: 500 })));
     await expect(request({ method: "GET", path: "/bad", skipRefresh: true, schema: MessageSchema })).rejects.toMatchObject({ detail: "plain" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<!doctype html><html><body>not json</body></html>", { headers: { "content-type": "text/html" }, status: 404 })));
+    await expect(request({ method: "GET", path: "/bad", skipRefresh: true, schema: MessageSchema })).rejects.toMatchObject({
+      detail: "Auth API returned HTML for 404. Check PUBLIC_AUTH_API_BASE and backend routing.",
+      message: "Auth API returned HTML for 404. Check PUBLIC_AUTH_API_BASE and backend routing.",
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new TextEncoder().encode("<html><body>not json</body></html>"), { status: 502 })));
+    await expect(request({ method: "GET", path: "/bad", skipRefresh: true, schema: MessageSchema })).rejects.toMatchObject({
+      message: "Auth API returned HTML for 502. Check PUBLIC_AUTH_API_BASE and backend routing.",
+    });
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
     await expect(request({ method: "DELETE", path: "/gone", schema: MessageSchema })).resolves.toBeUndefined();
   });

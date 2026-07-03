@@ -53,13 +53,11 @@ function bootstrapSession(): Promise<UserPublic | null> {
 }
 
 export function AuthProvider({ children, config, bootstrap = true }: { children: ReactNode; config?: Partial<AuthRuntimeConfig>; bootstrap?: boolean }) {
+  if (config) configureAuth(config);
+
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(bootstrap);
   const [error, setError] = useState<unknown>(null);
-
-  useEffect(() => {
-    if (config) configureAuth(config);
-  }, [config]);
 
   useEffect(() => {
     const onSession = (event: Event) => {
