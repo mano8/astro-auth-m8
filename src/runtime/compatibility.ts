@@ -1,10 +1,10 @@
 export const FA_AUTH_M8_CONTRACT_ID = "fa-auth-m8";
 export const FA_AUTH_M8_CONTRACT_VERSION = "1.0";
 export const FA_AUTH_M8_CONTRACT = `${FA_AUTH_M8_CONTRACT_ID}@${FA_AUTH_M8_CONTRACT_VERSION}` as const;
-// 1.0.0 is the supported fa-auth-m8 service baseline for this plugin.
-export const FA_AUTH_M8_TESTED_SERVICE_VERSION = "1.0.0";
+// 1.1.0 is the supported fa-auth-m8 service baseline for this plugin.
+export const FA_AUTH_M8_TESTED_SERVICE_VERSION = "1.1.0";
 export const FA_AUTH_M8_MIN_SERVICE_VERSION = "1.0.0";
-export const FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE = "1.1.0";
+export const FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE = "2.0.0";
 export const FA_AUTH_M8_SERVICE_VERSION_RANGE = `>=${FA_AUTH_M8_MIN_SERVICE_VERSION} <${FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE}`;
 
 export type FaAuthM8CompatibilityStatus = "compatible" | "incompatible" | "unknown";
