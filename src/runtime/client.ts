@@ -6,6 +6,7 @@ import { TokenSchema } from "./schemas.js";
 
 export * from "./api/index.js";
 export { clearToken, getToken, setToken } from "./tokenStore.js";
+export { configureAuth, getAuthConfig, type AuthRuntimeConfig } from "./config.js";
 
 export type RequestOptions<T> = {
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
