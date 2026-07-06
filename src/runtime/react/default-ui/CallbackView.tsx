@@ -25,8 +25,10 @@ export function CallbackView() {
   }, []);
 
   return (
-    <section className="not-content fa-auth-panel">
-      <p role={state.role}>{state.message}</p>
+    <section className="not-content fa-auth-panel mx-auto flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border/70 bg-card/95 p-6 text-card-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90">
+      <p className={state.role === "alert" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} role={state.role}>
+        {state.message}
+      </p>
     </section>
   );
 }

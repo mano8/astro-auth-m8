@@ -6,6 +6,27 @@ const defaultInputClassName =
   "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40";
 const defaultLabelClassName =
   "flex items-center gap-2 pb-2 text-sm leading-none font-medium select-none";
+const defaultRootClassName =
+  "not-content fa-auth-panel mx-auto flex w-full max-w-md flex-col gap-6 rounded-2xl border border-border/70 bg-card/95 p-6 text-card-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90";
+const defaultHeaderClassName = "space-y-2";
+const defaultTitleClassName = "text-3xl font-semibold tracking-tight text-foreground";
+const defaultDescriptionClassName = "text-sm text-muted-foreground";
+const defaultFormClassName = "space-y-5";
+const defaultContentClassName = "space-y-4";
+const defaultErrorClassName =
+  "rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive";
+const defaultFieldClassName = "space-y-2";
+const defaultFieldErrorClassName = "text-sm text-destructive";
+const defaultFooterClassName = "space-y-3";
+const defaultSubmitButtonClassName =
+  "inline-flex min-h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50";
+const defaultDividerClassName = "relative flex items-center py-1";
+const defaultDividerTextClassName =
+  "mx-auto bg-card px-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground";
+const defaultGoogleButtonClassName =
+  "inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50";
+const defaultGoogleIconClassName = "inline-flex items-center";
+const defaultAfterClassName = "text-sm text-muted-foreground [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 [&_a:hover]:underline";
 
 export type LoginFormClassNames = Partial<{
   root: string;
@@ -121,20 +142,20 @@ export function LoginForm({
   };
 
   return (
-    <section className={classNames.root ?? "not-content fa-auth-panel"}>
-      <div className={classNames.header}>
-        <h1 className={classNames.title}>{loginTitle}</h1>
-        {loginDescription ? <p className={classNames.description}>{loginDescription}</p> : null}
+    <section className={classNames.root ?? defaultRootClassName}>
+      <div className={classNames.header ?? defaultHeaderClassName}>
+        <h1 className={classNames.title ?? defaultTitleClassName}>{loginTitle}</h1>
+        {loginDescription ? <p className={classNames.description ?? defaultDescriptionClassName}>{loginDescription}</p> : null}
       </div>
-      <form className={classNames.form} onSubmit={handleSubmit}>
-        <div className={classNames.content}>
+      <form className={classNames.form ?? defaultFormClassName} onSubmit={handleSubmit}>
+        <div className={classNames.content ?? defaultContentClassName}>
           {apiError ? (
-            <div className={classNames.error} role="alert">
+            <div className={classNames.error ?? defaultErrorClassName} role="alert">
               {apiError}
             </div>
           ) : null}
 
-          <div className={classNames.field}>
+          <div className={classNames.field ?? defaultFieldClassName}>
             <label className={classNames.label ?? defaultLabelClassName} htmlFor="username">
               {userLabel}
             </label>
@@ -148,11 +169,11 @@ export function LoginForm({
               type="email"
             />
             {formErrors.username ? (
-              <p className={classNames.fieldError}>{formErrors.username}</p>
+              <p className={classNames.fieldError ?? defaultFieldErrorClassName}>{formErrors.username}</p>
             ) : null}
           </div>
 
-          <div className={classNames.field}>
+          <div className={classNames.field ?? defaultFieldClassName}>
             <label className={classNames.label ?? defaultLabelClassName} htmlFor="password">
               {passwordLabel}
             </label>
@@ -165,30 +186,30 @@ export function LoginForm({
               type="password"
             />
             {formErrors.password ? (
-              <p className={classNames.fieldError}>{formErrors.password}</p>
+              <p className={classNames.fieldError ?? defaultFieldErrorClassName}>{formErrors.password}</p>
             ) : null}
           </div>
         </div>
 
-        <div className={classNames.footer}>
-          <button className={classNames.submitButton} disabled={isSubmitting} type="submit">
+        <div className={classNames.footer ?? defaultFooterClassName}>
+          <button className={classNames.submitButton ?? defaultSubmitButtonClassName} disabled={isSubmitting} type="submit">
             {isSubmitting ? signinLabel : signInButtonText}
           </button>
 
           {googleEnabled ? (
             <>
-              <div className={classNames.divider}>
-                <span className={classNames.dividerText}>{orText}</span>
+              <div className={classNames.divider ?? defaultDividerClassName}>
+                <span className={classNames.dividerText ?? defaultDividerTextClassName}>{orText}</span>
               </div>
-              <button className={classNames.googleButton} type="button" onClick={handleGoogleLogin}>
-                {googleIcon ? <span className={classNames.googleIcon}>{googleIcon}</span> : null}
+              <button className={classNames.googleButton ?? defaultGoogleButtonClassName} type="button" onClick={handleGoogleLogin}>
+                {googleIcon ? <span className={classNames.googleIcon ?? defaultGoogleIconClassName}>{googleIcon}</span> : null}
                 {signinWithGoogleButtonText}
               </button>
             </>
           ) : null}
         </div>
       </form>
-      {after ? <div className={classNames.after}>{after}</div> : null}
+      {after ? <div className={classNames.after ?? defaultAfterClassName}>{after}</div> : null}
     </section>
   );
 }

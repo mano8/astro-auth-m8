@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { getGlobalActivity, getUserActivity } from "../api/dashboard.js";
+import { refetchOrThrow } from "./queryHelpers.js";
 import { authKeys } from "../queryKeys.js";
 import type { UsersActivity } from "../schemas.js";
 
@@ -13,10 +14,7 @@ export function useDashboard(scope: "me" | "global" = "me", load = true) {
   });
   const { refetch } = activityQuery;
 
-  const reload = useCallback(async () => {
-    const result = await refetch({ throwOnError: true });
-    return result.data ?? null;
-  }, [refetch]);
+  const reload = useCallback(() => refetchOrThrow(refetch, null), [refetch]);
 
   const activity: UsersActivity | null = activityQuery.data ?? null;
   const loading = activityQuery.isLoading || activityQuery.isFetching;
@@ -24,7 +22,7 @@ export function useDashboard(scope: "me" | "global" = "me", load = true) {
   return {
     activity,
     loading,
-    error: activityQuery.error,
+    error: activityQuery.error ?? null,
     reload,
     isLoading: activityQuery.isLoading,
     isFetching: activityQuery.isFetching,
