@@ -51,6 +51,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run build:registry",
     "build:registry": "node scripts/build-registry.mjs",
+    "verify:starter-routes": "node scripts/verify-starter-routes.mjs",
     "test": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "vitest run"
@@ -63,11 +64,15 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@astrojs/react": "^5.0.7",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@tanstack/react-query": "5.101.1",
     "@vitest/coverage-v8": "^4.1.9",
+    "astro": "^6.0.0",
     "jsdom": "^29.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "^5.8.0",
     "vitest": "^4.1.9"
   },
