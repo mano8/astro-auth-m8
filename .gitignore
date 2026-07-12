@@ -147,5 +147,4 @@ vite.config.ts.timestamp-*
 .vite/
 
 # Claude
-CLAUDE.md
 .claude/
