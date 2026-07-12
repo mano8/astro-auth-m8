@@ -1,6 +1,6 @@
 {
   "name": "@mano8/astro-auth-m8",
-  "version": "0.1.0-alpha.3",
+  "version": "1.0.0",
   "description": "Astro integration and headless client for fa-auth-m8.",
   "type": "module",
   "license": "MIT",
@@ -57,7 +57,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@mano8/astro-ui-m8": "^0.1.0-alpha.1"
+    "@mano8/astro-ui-m8": "^1.0.0"
   },
   "peerDependencies": {
     "astro": "^5.0.0 || ^6.0.0",
