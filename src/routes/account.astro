@@ -1,9 +1,6 @@
 ---
-import { AuthProvider } from "@mano8/astro-auth-m8/react";
-import { AccountView } from "@mano8/astro-auth-m8/default-ui";
+import { StarterAccountPage } from "@mano8/astro-auth-m8/default-ui";
 import AuthStyles from "./_AuthStyles.astro";
 ---
 <AuthStyles />
-<AuthProvider client:load config={{ apiBase: import.meta.env.PUBLIC_FA_AUTH_API_BASE }}>
-  <AccountView />
-</AuthProvider>
+<StarterAccountPage client:load config={{ apiBase: import.meta.env.PUBLIC_FA_AUTH_API_BASE }} />

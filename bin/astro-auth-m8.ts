@@ -25,7 +25,7 @@ function write(target: string, content: string, force: boolean): void {
 const files: Record<string, string> = {
   "pages/login.astro": `---\nimport { AuthProvider } from "@mano8/astro-auth-m8/react";\nimport { LoginView } from "../components/LoginView";\nimport "../styles/auth.css";\n---\n<AuthProvider client:load>\n  <LoginView />\n</AuthProvider>\n`,
   "pages/account.astro": `---\nimport { AuthProvider } from "@mano8/astro-auth-m8/react";\nimport { AccountView } from "../components/AccountView";\nimport "../styles/auth.css";\n---\n<AuthProvider client:load>\n  <AccountView />\n</AuthProvider>\n`,
-  "pages/logout.astro": `---\nimport "../styles/auth.css";\n---\n<form class="fa-auth-panel">\n  <h1>Sign out</h1>\n  <button type="button" id="fa-auth-logout">Sign out</button>\n</form>\n<script>\n  import { logout } from "@mano8/astro-auth-m8/client";\n  document.getElementById("fa-auth-logout")?.addEventListener("click", async () => {\n    await logout();\n    window.location.assign("/auth/login");\n  });\n</script>\n`,
+  "pages/logout.astro": `---\nimport "../styles/auth.css";\n---\n<form class="fa-auth-panel mx-auto flex w-full max-w-md flex-col gap-6 rounded-2xl border border-border/70 bg-card/95 p-6 text-card-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90">\n  <div class="space-y-2">\n    <h1 class="text-3xl font-semibold tracking-tight text-foreground">Sign out</h1>\n    <p class="text-sm text-muted-foreground">End the current session and return to the login screen.</p>\n  </div>\n  <button type="button" id="fa-auth-logout" class="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90">Sign out</button>\n</form>\n<script>\n  import { logout } from "@mano8/astro-auth-m8/client";\n  document.getElementById("fa-auth-logout")?.addEventListener("click", async () => {\n    await logout();\n    window.location.assign("/auth/login");\n  });\n</script>\n`,
   "pages/callback.astro": `---\nimport { CallbackView } from "../components/CallbackView";\nimport "../styles/auth.css";\n---\n<CallbackView client:load />\n`,
   "pages/signup.astro": `---\nimport { SignupView } from "../components/SignupView";\nimport "../styles/auth.css";\n---\n<SignupView client:load />\n`,
   "components/LoginView.tsx": `export { LoginView } from "@mano8/astro-auth-m8/default-ui";\n`,
@@ -37,7 +37,7 @@ const files: Record<string, string> = {
   "i18n/en.ts": `export const authCopy = { signIn: "Sign in", account: "Account" };\n`,
   "i18n/es.ts": `export const authCopy = { signIn: "Iniciar sesion", account: "Cuenta" };\n`,
   "i18n/fr.ts": `export const authCopy = { signIn: "Connexion", account: "Compte" };\n`,
-  "styles/auth.css": `.fa-auth-panel { width: min(100% - 32px, 420px); margin: 64px auto; font-family: system-ui, sans-serif; }\n.fa-auth-panel form, .fa-auth-panel label { display: grid; gap: 12px; }\n.fa-auth-panel input, .fa-auth-panel button { min-height: 40px; font: inherit; }\n`
+  "styles/auth.css": `@import "@mano8/astro-ui-m8/src/lib/tokens.css";\n\n.fa-auth-panel select { color-scheme: light; }\n:root[data-theme='dark'] .fa-auth-panel select { color-scheme: dark; }\n.fa-auth-panel select option { background-color: var(--popover, Canvas); color: var(--popover-foreground, CanvasText); }\n`
 };
 
 if (command !== "scaffold" || !hasFlag("--views")) {

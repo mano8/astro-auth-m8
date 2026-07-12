@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { deleteProfile, getProfile, updatePassword, updateProfile } from "../api/profile.js";
+import { refetchOrThrow } from "./queryHelpers.js";
 import { authKeys } from "../queryKeys.js";
 import type { UpdatePassword, UserPublic, UserUpdateMe } from "../schemas.js";
 
@@ -33,10 +34,7 @@ export function useProfile(load = true) {
   const { mutateAsync: changePasswordAsync } = changePasswordMutation;
   const { mutateAsync: removeProfileAsync } = removeMutation;
 
-  const reload = useCallback(async () => {
-    const result = await refetch({ throwOnError: true });
-    return result.data ?? null;
-  }, [refetch]);
+  const reload = useCallback(() => refetchOrThrow(refetch, null), [refetch]);
 
   const save = useCallback((body: UserUpdateMe) => saveProfileAsync(body), [saveProfileAsync]);
   const changePassword = useCallback((body: UpdatePassword) => changePasswordAsync(body), [changePasswordAsync]);
@@ -48,7 +46,7 @@ export function useProfile(load = true) {
   return {
     profile,
     loading,
-    error: profileQuery.error,
+    error: profileQuery.error ?? null,
     reload,
     save,
     changePassword,

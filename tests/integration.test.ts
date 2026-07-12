@@ -102,4 +102,14 @@ describe("Astro integration", () => {
       expect(source).not.toContain('import "../scaffold/styles/auth.css"');
     }
   });
+
+  it("uses package-owned starter page wrappers for auth-context views", () => {
+    const loginSource = readFileSync(resolve(testDir, "../src/routes/login.astro"), "utf8");
+    const accountSource = readFileSync(resolve(testDir, "../src/routes/account.astro"), "utf8");
+
+    expect(loginSource).toContain("StarterLoginPage");
+    expect(accountSource).toContain("StarterAccountPage");
+    expect(loginSource).not.toContain("<AuthProvider");
+    expect(accountSource).not.toContain("<AuthProvider");
+  });
 });

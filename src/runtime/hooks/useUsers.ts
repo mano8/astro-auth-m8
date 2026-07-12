@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { createUser, deleteUser, getUser, listUsers, signupUser, updateUser } from "../api/users.js";
+import { refetchOrThrow } from "./queryHelpers.js";
 import { authKeys } from "../queryKeys.js";
 import type { UserCreate, UserRegister, UserUpdate, UsersPublic } from "../schemas.js";
 
@@ -54,10 +55,7 @@ export function useUsers(load = true) {
   const { mutateAsync: updateUserAsync } = updateMutation;
   const { mutateAsync: removeUserAsync } = removeMutation;
 
-  const reload = useCallback(async () => {
-    const result = await refetch({ throwOnError: true });
-    return result.data ?? null;
-  }, [refetch]);
+  const reload = useCallback(() => refetchOrThrow(refetch, null), [refetch]);
 
   const create = useCallback((body: UserCreate) => createUserAsync(body), [createUserAsync]);
   const signup = useCallback((body: UserRegister) => signupUserAsync(body), [signupUserAsync]);
@@ -75,7 +73,7 @@ export function useUsers(load = true) {
   return {
     users,
     loading,
-    error: usersQuery.error,
+    error: usersQuery.error ?? null,
     reload,
     create,
     signup,

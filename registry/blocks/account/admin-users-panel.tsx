@@ -1,20 +1,27 @@
 "use client";
 
 // fa-auth admin users panel: superuser-only user management (create / update /
-// delete). Headless logic stays a live dependency — `useUsers`
+// delete). Headless logic stays a live dependency - `useUsers`
 // (@mano8/astro-auth-m8/hooks) owns the API calls, the package Zod schemas
 // validate the forms, and the package's `RequireRole superuser` gates the whole
 // panel. This file is only the shadcn skin, copied into the consumer via the
-// @fa-m8-auth registry — edit (and translate via `labels`) freely per app.
+// @fa-m8-auth registry - edit (and translate via `labels`) freely per app.
 import * as React from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
 import { RequireRole } from "@mano8/astro-auth-m8/react";
 import { useUsers } from "@mano8/astro-auth-m8/hooks";
-import { RoleTypeSchema, UserCreateSchema, UserUpdateSchema } from "@mano8/astro-auth-m8/schemas";
+import {
+  RoleTypeSchema,
+  UserCreateSchema,
+  UserUpdateSchema,
+  type UserPublic,
+} from "@mano8/astro-auth-m8/schemas";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DataTable } from "@/components/m8-ui/data-table";
 import {
   Card,
   CardContent,
@@ -33,6 +40,7 @@ export interface AdminUsersPanelLabels {
   updated: string;
   createFailed: string;
   updateFailed: string;
+  deleteFailed: string;
   email: string;
   fullName: string;
   avatar: string;
@@ -56,6 +64,7 @@ export interface AdminUsersPanelLabels {
   inactive: string;
   save: string;
   delete: string;
+  empty: string;
 }
 
 const DEFAULT_LABELS: AdminUsersPanelLabels = {
@@ -69,6 +78,7 @@ const DEFAULT_LABELS: AdminUsersPanelLabels = {
   updated: "User updated.",
   createFailed: "Failed to create user.",
   updateFailed: "Failed to update user.",
+  deleteFailed: "Failed to delete user.",
   email: "Email",
   fullName: "Full name",
   avatar: "Avatar URL",
@@ -92,6 +102,7 @@ const DEFAULT_LABELS: AdminUsersPanelLabels = {
   inactive: "Inactive",
   save: "Save",
   delete: "Delete",
+  empty: "No users found.",
 };
 
 function formString(formData: FormData, key: string): string | undefined {
@@ -176,6 +187,144 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
     }
   };
 
+  const handleDelete = React.useCallback(
+    async (id: string) => {
+      setMessage(null);
+      try {
+        await remove(id);
+        await reload();
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : t.deleteFailed);
+      }
+    },
+    [reload, remove, t.deleteFailed],
+  );
+
+  const columns = React.useMemo<ColumnDef<UserPublic>[]>(
+    () => [
+      {
+        accessorKey: "email",
+        header: t.user,
+        cell: ({ row }) => {
+          const user = row.original;
+          const formId = `admin-user-${user.id}`;
+          return (
+            <form
+              id={formId}
+              onSubmit={(event) => void handleUpdate(event, user.id)}
+              className="grid min-w-[20rem] gap-2"
+            >
+              <Input name="email" type="email" defaultValue={user.email} required />
+              <Input
+                name="full_name"
+                defaultValue={user.full_name ?? ""}
+                placeholder={t.fullName}
+              />
+              <Input
+                name="avatar"
+                type="url"
+                defaultValue={user.avatar ?? ""}
+                placeholder={t.avatarPlaceholder}
+              />
+              <Input
+                name="password"
+                type="password"
+                placeholder={
+                  user.provider === "password"
+                    ? t.passwordPlaceholder
+                    : t.passwordUnsupported
+                }
+                disabled={user.provider === "google"}
+              />
+            </form>
+          );
+        },
+      },
+      {
+        accessorKey: "role",
+        header: t.role,
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <select
+              name="role"
+              form={`admin-user-${user.id}`}
+              defaultValue={user.role}
+              className={inputClassName}
+            >
+              {RoleTypeSchema.options.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+          );
+        },
+      },
+      {
+        accessorKey: "provider",
+        header: t.provider,
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="space-y-2">
+              <span className="inline-flex h-8 items-center rounded-md border bg-muted/40 px-2 text-sm capitalize">
+                {user.provider === "google" ? t.providerGoogle : t.providerPassword}
+              </span>
+              <p className="text-xs text-muted-foreground">
+                {user.is_active ? t.active : t.inactive}
+                {user.email_verified ? ` - ${t.emailVerified}` : ""}
+                {user.is_superuser ? ` - ${t.superuser}` : ""}
+              </p>
+            </div>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: t.actions,
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" form={`admin-user-${user.id}`} size="sm">
+                {t.save}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                onClick={() => void handleDelete(user.id)}
+              >
+                <Trash2 />
+                {t.delete}
+              </Button>
+            </div>
+          );
+        },
+      },
+    ],
+    [
+      handleDelete,
+      t.actions,
+      t.active,
+      t.avatarPlaceholder,
+      t.delete,
+      t.emailVerified,
+      t.fullName,
+      t.inactive,
+      t.passwordPlaceholder,
+      t.passwordUnsupported,
+      t.provider,
+      t.providerGoogle,
+      t.providerPassword,
+      t.role,
+      t.save,
+      t.superuser,
+      t.user,
+    ],
+  );
+
   return (
     <Card className="not-content">
       <CardHeader>
@@ -183,34 +332,70 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
         <CardDescription>{t.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <p className="text-sm text-muted-foreground">
-          {t.updateScope}
-        </p>
-        <form onSubmit={handleCreate} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 md:items-end">
+        <p className="text-sm text-muted-foreground">{t.updateScope}</p>
+        <form
+          onSubmit={handleCreate}
+          className="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-4"
+        >
           <div className="space-y-1">
-            <Label htmlFor="admin-create-email" className="pb-2">{t.email}</Label>
+            <Label htmlFor="admin-create-email" className="pb-2">
+              {t.email}
+            </Label>
             <Input id="admin-create-email" name="email" type="email" required />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-name" className="pb-2">{t.fullName}</Label>
+            <Label htmlFor="admin-create-name" className="pb-2">
+              {t.fullName}
+            </Label>
             <Input id="admin-create-name" name="full_name" />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-avatar" className="pb-2">{t.avatar}</Label>
-            <Input id="admin-create-avatar" name="avatar" type="url" placeholder={t.avatarPlaceholder} />
+            <Label htmlFor="admin-create-avatar" className="pb-2">
+              {t.avatar}
+            </Label>
+            <Input
+              id="admin-create-avatar"
+              name="avatar"
+              type="url"
+              placeholder={t.avatarPlaceholder}
+            />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-password" className="pb-2">{t.password}</Label>
-            <Input id="admin-create-password" name="password" type="password" minLength={8} required />
+            <Label htmlFor="admin-create-password" className="pb-2">
+              {t.password}
+            </Label>
+            <Input
+              id="admin-create-password"
+              name="password"
+              type="password"
+              minLength={8}
+              required
+            />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="admin-create-role" className="pb-2">{t.role}</Label>
-            <select id="admin-create-role" name="role" defaultValue="user" className={inputClassName}>
-              {RoleTypeSchema.options.map((role) => <option key={role} value={role}>{role}</option>)}
+            <Label htmlFor="admin-create-role" className="pb-2">
+              {t.role}
+            </Label>
+            <select
+              id="admin-create-role"
+              name="role"
+              defaultValue="user"
+              className={inputClassName}
+            >
+              {RoleTypeSchema.options.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
             </select>
           </div>
           <label className="flex items-center gap-2 pb-2 text-sm">
-            <input name="is_active" type="checkbox" defaultChecked className="size-4" />
+            <input
+              name="is_active"
+              type="checkbox"
+              defaultChecked
+              className="size-4"
+            />
             {t.active}
           </label>
           <label className="flex items-center gap-2 pb-2 text-sm">
@@ -221,8 +406,15 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
         </form>
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{count} {t.users}</p>
-          <Button type="button" size="sm" variant="outline" onClick={() => reload()}>
+          <p className="text-sm text-muted-foreground">
+            {count} {t.users}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void reload()}
+          >
             <RefreshCw />
             {t.refresh}
           </Button>
@@ -235,69 +427,14 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
         {loading && users.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t.loading}</p>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b bg-muted/40 text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">{t.user}</th>
-                  <th className="px-3 py-2 font-medium">{t.role}</th>
-                  <th className="px-3 py-2 font-medium">{t.provider}</th>
-                  <th className="px-3 py-2 font-medium">{t.actions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td className="px-3 py-3 align-top">
-                      <form id={`admin-user-${user.id}`} onSubmit={(event) => handleUpdate(event, user.id)} className="grid gap-2">
-                        <Input name="email" type="email" defaultValue={user.email} required />
-                        <Input name="full_name" defaultValue={user.full_name ?? ""} placeholder={t.fullName} />
-                        <Input name="avatar" type="url" defaultValue={user.avatar ?? ""} placeholder={t.avatarPlaceholder} />
-                        <Input
-                          name="password"
-                          type="password"
-                          placeholder={user.provider === "password" ? t.passwordPlaceholder : t.passwordUnsupported}
-                          disabled={user.provider === "google"}
-                        />
-                      </form>
-                    </td>
-                    <td className="px-3 py-3 align-top">
-                      <select name="role" form={`admin-user-${user.id}`} defaultValue={user.role} className={inputClassName}>
-                        {RoleTypeSchema.options.map((role) => <option key={role} value={role}>{role}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-3 align-top">
-                      <span className="inline-flex h-8 items-center rounded-md border bg-muted/40 px-2 text-sm capitalize">
-                        {user.provider === "google" ? t.providerGoogle : t.providerPassword}
-                      </span>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {user.is_active ? t.active : t.inactive}
-                        {user.email_verified ? ` - ${t.emailVerified}` : ""}
-                        {user.is_superuser ? ` - ${t.superuser}` : ""}
-                      </p>
-                    </td>
-                    <td className="px-3 py-3 align-top">
-                      <div className="flex gap-2">
-                        <Button type="submit" form={`admin-user-${user.id}`} size="sm">{t.save}</Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={async () => {
-                            await remove(user.id);
-                            await reload();
-                          }}
-                        >
-                          <Trash2 />
-                          {t.delete}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={users}
+            filterColumn="email"
+            filterPlaceholder={t.email}
+            emptyMessage={t.empty}
+            pageSize={5}
+          />
         )}
       </CardContent>
     </Card>

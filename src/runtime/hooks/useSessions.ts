@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { getCurrentSession, listSessions, revokeSession } from "../api/sessions.js";
+import { refetchOrThrow } from "./queryHelpers.js";
 import { authKeys } from "../queryKeys.js";
 import type { ClientSessionPublic, ClientSessionsPublic } from "../schemas.js";
 
@@ -30,15 +31,9 @@ export function useSessions(load = true) {
   const { refetch: refetchCurrent } = currentQuery;
   const { mutateAsync: revokeSessionAsync } = revokeMutation;
 
-  const reload = useCallback(async () => {
-    const result = await refetchSessions({ throwOnError: true });
-    return result.data ?? null;
-  }, [refetchSessions]);
+  const reload = useCallback(() => refetchOrThrow(refetchSessions, null), [refetchSessions]);
 
-  const reloadCurrent = useCallback(async () => {
-    const result = await refetchCurrent({ throwOnError: true });
-    return result.data ?? null;
-  }, [refetchCurrent]);
+  const reloadCurrent = useCallback(() => refetchOrThrow(refetchCurrent, null), [refetchCurrent]);
 
   const revoke = useCallback((id: string) => revokeSessionAsync(id), [revokeSessionAsync]);
 
@@ -51,7 +46,7 @@ export function useSessions(load = true) {
     sessions,
     current,
     loading,
-    error,
+    error: error ?? null,
     reload,
     reloadCurrent,
     revoke,

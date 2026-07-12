@@ -4,21 +4,6 @@
   "homepage": "https://github.com/mano8/astro-auth-m8",
   "items": [
     {
-      "name": "data-table",
-      "type": "registry:component",
-      "title": "Data Table",
-      "description": "Generic pure-shadcn data table (sorting, filtering, pagination) built on @tanstack/react-table.",
-      "dependencies": ["@tanstack/react-table"],
-      "registryDependencies": ["table", "button", "input"],
-      "files": [
-        {
-          "path": "registry/blocks/data-table/data-table.tsx",
-          "type": "registry:component",
-          "target": "components/fa-auth/data-table.tsx"
-        }
-      ]
-    },
-    {
       "name": "activity-bar-chart",
       "type": "registry:component",
       "title": "Activity Bar Chart",
@@ -119,7 +104,13 @@
       "title": "Admin Users Panel",
       "description": "fa-auth superuser-only user management (create/update/delete), gated by the package's RequireRole and driven by useUsers. Requires @mano8/astro-auth-m8 installed.",
       "dependencies": ["lucide-react"],
-      "registryDependencies": ["card", "button", "input", "label"],
+      "registryDependencies": [
+        "card",
+        "button",
+        "input",
+        "label",
+        "./node_modules/@mano8/astro-ui-m8/registry/r/data-table.json"
+      ],
       "files": [
         {
           "path": "registry/blocks/account/admin-users-panel.tsx",

@@ -5,9 +5,21 @@ import AuthStyles from "./_AuthStyles.astro";
 ---
 <AuthStyles />
 <AuthProvider client:load config={{ apiBase: import.meta.env.PUBLIC_FA_AUTH_API_BASE }}>
-  <form class="fa-auth-panel" method="post">
-    <h1>Sign out</h1>
-    <button type="button" id="fa-auth-logout">Sign out</button>
+  <form
+    class="fa-auth-panel mx-auto flex w-full max-w-md flex-col gap-6 rounded-2xl border border-border/70 bg-card/95 p-6 text-card-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90"
+    method="post"
+  >
+    <div class="space-y-2">
+      <h1 class="text-3xl font-semibold tracking-tight text-foreground">Sign out</h1>
+      <p class="text-sm text-muted-foreground">End the current session and return to the login screen.</p>
+    </div>
+    <button
+      type="button"
+      id="fa-auth-logout"
+      class="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
+    >
+      Sign out
+    </button>
   </form>
 </AuthProvider>
 <script>
