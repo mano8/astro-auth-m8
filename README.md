@@ -1,5 +1,7 @@
 # astro-auth-m8
 
+![CI/CD](https://github.com/mano8/astro-auth-m8/actions/workflows/CI.yaml/badge.svg?branch=main)
+
 Astro integration and headless runtime client for `fa-auth-m8`.
 
 Part of the M8 auth stack: [mano8/astro-auth-m8](https://github.com/mano8/astro-auth-m8) is the Astro plugin layer for the [mano8/fa-auth-m8](https://github.com/mano8/fa-auth-m8) backend service, and it is ready to compose into [mano8/fa-ui-m8](https://github.com/mano8/fa-ui-m8).
