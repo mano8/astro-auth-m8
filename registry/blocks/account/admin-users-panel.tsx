@@ -7,7 +7,8 @@
 // panel. This file is only the shadcn skin, copied into the consumer via the
 // @fa-m8-auth registry - edit (and translate via `labels`) freely per app.
 import * as React from "react";
-import { RefreshCw, Trash2 } from "lucide-react";
+import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
+import { UserPlus } from "lucide-react";
 import { RequireRole } from "@mano8/astro-auth-m8/react";
 import { useUsers } from "@mano8/astro-auth-m8/hooks";
 import {
@@ -16,12 +17,11 @@ import {
   UserUpdateSchema,
   type UserPublic,
 } from "@mano8/astro-auth-m8/schemas";
-import type { ColumnDef } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DataTable } from "@/components/m8-ui/data-table";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -29,6 +29,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DialogFooter } from "@/components/ui/dialog";
+import {
+  DataTable,
+  createDataTableSelectionColumn,
+} from "@/components/m8-ui/data-table";
+import { DataTableColumnHeader } from "@/components/m8-ui/data-table-column-header";
+import {
+  AccountToastHost,
+  accountToast,
+  ConfirmDeleteDialog,
+  EntityFormDialog,
+  RowActions,
+  errorMessage,
+  useClientTable,
+} from "./account-crud";
 
 export interface AdminUsersPanelLabels {
   title: string;
@@ -41,6 +56,7 @@ export interface AdminUsersPanelLabels {
   createFailed: string;
   updateFailed: string;
   deleteFailed: string;
+  deleted: string;
   email: string;
   fullName: string;
   avatar: string;
@@ -49,22 +65,29 @@ export interface AdminUsersPanelLabels {
   passwordPlaceholder: string;
   passwordUnsupported: string;
   create: string;
+  createTitle: string;
+  editTitle: string;
   role: string;
   emailVerified: string;
   superuser: string;
   users: string;
-  refresh: string;
   loading: string;
-  user: string;
   provider: string;
   providerPassword: string;
   providerGoogle: string;
   actions: string;
+  status: string;
   active: string;
   inactive: string;
   save: string;
+  cancel: string;
+  edit: string;
   delete: string;
+  deleteSelected: string;
+  confirmDeleteTitle: string;
+  confirmDeleteBody: string;
   empty: string;
+  search: string;
 }
 
 const DEFAULT_LABELS: AdminUsersPanelLabels = {
@@ -79,6 +102,7 @@ const DEFAULT_LABELS: AdminUsersPanelLabels = {
   createFailed: "Failed to create user.",
   updateFailed: "Failed to update user.",
   deleteFailed: "Failed to delete user.",
+  deleted: "User deleted.",
   email: "Email",
   fullName: "Full name",
   avatar: "Avatar URL",
@@ -86,362 +110,609 @@ const DEFAULT_LABELS: AdminUsersPanelLabels = {
   password: "Password",
   passwordPlaceholder: "Leave blank to keep current password",
   passwordUnsupported: "Password disabled for Google users",
-  create: "Create",
+  create: "Create user",
+  createTitle: "Create user",
+  editTitle: "Edit user",
   role: "Role",
   emailVerified: "Email verified",
   superuser: "Superuser",
   users: "users",
-  refresh: "Refresh",
   loading: "Loading users...",
-  user: "User",
   provider: "Provider",
   providerPassword: "Password",
   providerGoogle: "Google",
   actions: "Actions",
+  status: "Status",
   active: "Active",
   inactive: "Inactive",
   save: "Save",
+  cancel: "Cancel",
+  edit: "Edit",
   delete: "Delete",
+  deleteSelected: "Delete selected",
+  confirmDeleteTitle: "Delete user?",
+  confirmDeleteBody:
+    "This permanently removes the user account and revokes its access.",
   empty: "No users found.",
+  search: "Search users",
 };
 
-function formString(formData: FormData, key: string): string | undefined {
-  const value = formData.get(key);
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+interface CreateFormState {
+  email: string;
+  full_name: string;
+  avatar: string;
+  password: string;
+  role: string;
+  is_active: boolean;
+  is_superuser: boolean;
 }
 
-const inputClassName =
-  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40";
+interface EditFormState {
+  email: string;
+  full_name: string;
+  avatar: string;
+  password: string;
+  role: string;
+}
+
+const EMPTY_CREATE: CreateFormState = {
+  email: "",
+  full_name: "",
+  avatar: "",
+  password: "",
+  role: "user",
+  is_active: true,
+  is_superuser: false,
+};
+
+const selectClassName =
+  "h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
+function RoleSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      id={id}
+      aria-label="Role"
+      className={selectClassName}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {RoleTypeSchema.options.map((role) => (
+        <option key={role} value={role}>
+          {role}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
-  const { users: usersData, loading, error, reload, create, update, remove } = useUsers(false);
+  const { users: usersData, loading, reload, create, update, remove } =
+    useUsers(false);
   const users = usersData?.data ?? [];
-  const count = usersData?.count ?? 0;
-  const errorText = error instanceof Error ? error.message : error ? String(error) : null;
-  const [message, setMessage] = React.useState<string | null>(null);
+
+  const [creating, setCreating] = React.useState(false);
+  const [createForm, setCreateForm] =
+    React.useState<CreateFormState>(EMPTY_CREATE);
+  const [editing, setEditing] = React.useState<UserPublic | null>(null);
+  const [editForm, setEditForm] = React.useState<EditFormState | null>(null);
+  const [deleting, setDeleting] = React.useState<UserPublic | null>(null);
+  const [bulkDelete, setBulkDelete] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
   React.useEffect(() => {
     reload().catch(() => {});
   }, [reload]);
 
+  const openCreate = () => {
+    setCreateForm(EMPTY_CREATE);
+    setCreating(true);
+  };
+
+  const openEdit = (user: UserPublic) => {
+    setEditForm({
+      email: user.email,
+      full_name: user.full_name ?? "",
+      avatar: user.avatar ?? "",
+      password: "",
+      role: user.role,
+    });
+    setEditing(user);
+  };
+
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage(null);
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const role = formString(formData, "role");
-    // Superadmins create password-based accounts only; OAuth credentials and the
-    // email_verified flag are owned by the auth service's internal sign-in flow.
     const parsed = UserCreateSchema.safeParse({
-      email: formString(formData, "email"),
-      password: formString(formData, "password"),
-      full_name: formString(formData, "full_name"),
-      avatar: formString(formData, "avatar"),
+      email: createForm.email || undefined,
+      password: createForm.password || undefined,
+      full_name: createForm.full_name || undefined,
+      avatar: createForm.avatar || undefined,
       provider: "password",
-      role: role ? RoleTypeSchema.parse(role) : "user",
-      is_active: formData.get("is_active") === "on",
-      is_superuser: formData.get("is_superuser") === "on",
+      role: createForm.role ? RoleTypeSchema.parse(createForm.role) : "user",
+      is_active: createForm.is_active,
+      is_superuser: createForm.is_superuser,
     });
-
     if (!parsed.success) {
-      setMessage(parsed.error.issues[0]?.message ?? t.invalidCreate);
+      accountToast.error({
+        title: parsed.error.issues[0]?.message ?? t.invalidCreate,
+      });
       return;
     }
-
+    setSubmitting(true);
     try {
       await create(parsed.data);
-      await reload();
-      form.reset();
-      setMessage(t.created);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : t.createFailed);
+      setCreating(false);
+      accountToast.success({ title: t.created });
+    } catch (error) {
+      accountToast.error({ title: errorMessage(error, t.createFailed) });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleUpdate = async (event: React.FormEvent<HTMLFormElement>, id: string) => {
+  const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage(null);
-
-    const formData = new FormData(event.currentTarget);
-    // Provider and OAuth user ID are owned by the auth service and not editable here.
+    if (!editing || !editForm) return;
     const parsed = UserUpdateSchema.safeParse({
-      email: formString(formData, "email"),
-      full_name: formString(formData, "full_name"),
-      avatar: formString(formData, "avatar"),
-      password: formString(formData, "password"),
-      role: formString(formData, "role"),
+      email: editForm.email || undefined,
+      full_name: editForm.full_name || undefined,
+      avatar: editForm.avatar || undefined,
+      password: editForm.password || undefined,
+      role: editForm.role || undefined,
     });
-
     if (!parsed.success) {
-      setMessage(parsed.error.issues[0]?.message ?? t.invalidUpdate);
+      accountToast.error({
+        title: parsed.error.issues[0]?.message ?? t.invalidUpdate,
+      });
       return;
     }
-
+    setSubmitting(true);
     try {
-      await update(id, parsed.data);
-      await reload();
-      setMessage(t.updated);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : t.updateFailed);
+      await update(editing.id, parsed.data);
+      setEditing(null);
+      setEditForm(null);
+      accountToast.success({ title: t.updated });
+    } catch (error) {
+      accountToast.error({ title: errorMessage(error, t.updateFailed) });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = React.useCallback(
-    async (id: string) => {
-      setMessage(null);
-      try {
+  const confirmDelete = async (ids: string[]) => {
+    setSubmitting(true);
+    try {
+      for (const id of ids) {
         await remove(id);
-        await reload();
-      } catch (err) {
-        setMessage(err instanceof Error ? err.message : t.deleteFailed);
       }
+      accountToast.success({ title: t.deleted });
+      setDeleting(null);
+      setBulkDelete(false);
+      setRowSelection({});
+    } catch (error) {
+      accountToast.error({ title: errorMessage(error, t.deleteFailed) });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const controller = useClientTable(users, {
+    search: (user) => `${user.email} ${user.full_name ?? ""}`,
+    sorters: {
+      email: (user) => user.email,
+      role: (user) => user.role,
+      provider: (user) => user.provider,
+      status: (user) => (user.is_active ? t.active : t.inactive),
     },
-    [reload, remove, t.deleteFailed],
-  );
+    initialSortBy: "email",
+  });
 
   const columns = React.useMemo<ColumnDef<UserPublic>[]>(
     () => [
-      {
-        accessorKey: "email",
-        header: t.user,
-        cell: ({ row }) => {
-          const user = row.original;
-          const formId = `admin-user-${user.id}`;
-          return (
-            <form
-              id={formId}
-              onSubmit={(event) => void handleUpdate(event, user.id)}
-              className="grid min-w-[20rem] gap-2"
-            >
-              <Input name="email" type="email" defaultValue={user.email} required />
-              <Input
-                name="full_name"
-                defaultValue={user.full_name ?? ""}
-                placeholder={t.fullName}
-              />
-              <Input
-                name="avatar"
-                type="url"
-                defaultValue={user.avatar ?? ""}
-                placeholder={t.avatarPlaceholder}
-              />
-              <Input
-                name="password"
-                type="password"
-                placeholder={
-                  user.provider === "password"
-                    ? t.passwordPlaceholder
-                    : t.passwordUnsupported
-                }
-                disabled={user.provider === "google"}
-              />
-            </form>
-          );
-        },
-      },
-      {
-        accessorKey: "role",
-        header: t.role,
-        cell: ({ row }) => {
-          const user = row.original;
-          return (
-            <select
-              name="role"
-              form={`admin-user-${user.id}`}
-              defaultValue={user.role}
-              className={inputClassName}
-            >
-              {RoleTypeSchema.options.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-          );
-        },
-      },
-      {
-        accessorKey: "provider",
-        header: t.provider,
-        cell: ({ row }) => {
-          const user = row.original;
-          return (
-            <div className="space-y-2">
-              <span className="inline-flex h-8 items-center rounded-md border bg-muted/40 px-2 text-sm capitalize">
-                {user.provider === "google" ? t.providerGoogle : t.providerPassword}
-              </span>
-              <p className="text-xs text-muted-foreground">
-                {user.is_active ? t.active : t.inactive}
-                {user.email_verified ? ` - ${t.emailVerified}` : ""}
-                {user.is_superuser ? ` - ${t.superuser}` : ""}
-              </p>
-            </div>
-          );
-        },
-      },
+      createDataTableSelectionColumn<UserPublic>({
+        selectAllVisible: t.actions,
+        selectRow: (user) => `${t.edit} ${user.email}`,
+      }),
       {
         id: "actions",
         header: t.actions,
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <RowActions
+            editLabel={t.edit}
+            deleteLabel={t.delete}
+            onEdit={() => openEdit(row.original)}
+            onDelete={() => setDeleting(row.original)}
+          />
+        ),
+      },
+      {
+        accessorKey: "email",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.email} />
+        ),
+        cell: ({ row }) => (
+          <div className="min-w-0">
+            <div className="font-medium">{row.original.email}</div>
+            {row.original.full_name ? (
+              <div className="text-xs text-muted-foreground">
+                {row.original.full_name}
+              </div>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "role",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.role} />
+        ),
+        cell: ({ row }) => (
+          <span className="capitalize">{row.original.role}</span>
+        ),
+      },
+      {
+        accessorKey: "provider",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.provider} />
+        ),
+        cell: ({ row }) => (
+          <Badge variant="outline" className="capitalize">
+            {row.original.provider === "google"
+              ? t.providerGoogle
+              : t.providerPassword}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.status} />
+        ),
         cell: ({ row }) => {
           const user = row.original;
           return (
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" form={`admin-user-${user.id}`} size="sm">
-                {t.save}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="destructive"
-                onClick={() => void handleDelete(user.id)}
-              >
-                <Trash2 />
-                {t.delete}
-              </Button>
+            <div className="flex flex-wrap gap-1">
+              <Badge variant={user.is_active ? "default" : "outline"}>
+                {user.is_active ? t.active : t.inactive}
+              </Badge>
+              {user.email_verified ? (
+                <Badge variant="secondary">{t.emailVerified}</Badge>
+              ) : null}
+              {user.is_superuser ? (
+                <Badge variant="secondary">{t.superuser}</Badge>
+              ) : null}
             </div>
           );
         },
       },
     ],
-    [
-      handleDelete,
-      t.actions,
-      t.active,
-      t.avatarPlaceholder,
-      t.delete,
-      t.emailVerified,
-      t.fullName,
-      t.inactive,
-      t.passwordPlaceholder,
-      t.passwordUnsupported,
-      t.provider,
-      t.providerGoogle,
-      t.providerPassword,
-      t.role,
-      t.save,
-      t.superuser,
-      t.user,
-    ],
+    [t],
   );
 
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+  const editingGoogle = editing?.provider === "google";
+
   return (
-    <Card className="not-content">
+    <Card className="not-content w-full">
+      <AccountToastHost />
       <CardHeader>
         <CardTitle>{t.title}</CardTitle>
         <CardDescription>{t.description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">{t.updateScope}</p>
-        <form
-          onSubmit={handleCreate}
-          className="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-4"
-        >
-          <div className="space-y-1">
-            <Label htmlFor="admin-create-email" className="pb-2">
-              {t.email}
-            </Label>
-            <Input id="admin-create-email" name="email" type="email" required />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="admin-create-name" className="pb-2">
-              {t.fullName}
-            </Label>
-            <Input id="admin-create-name" name="full_name" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="admin-create-avatar" className="pb-2">
-              {t.avatar}
-            </Label>
-            <Input
-              id="admin-create-avatar"
-              name="avatar"
-              type="url"
-              placeholder={t.avatarPlaceholder}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="admin-create-password" className="pb-2">
-              {t.password}
-            </Label>
-            <Input
-              id="admin-create-password"
-              name="password"
-              type="password"
-              minLength={8}
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="admin-create-role" className="pb-2">
-              {t.role}
-            </Label>
-            <select
-              id="admin-create-role"
-              name="role"
-              defaultValue="user"
-              className={inputClassName}
-            >
-              {RoleTypeSchema.options.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="flex items-center gap-2 pb-2 text-sm">
-            <input
-              name="is_active"
-              type="checkbox"
-              defaultChecked
-              className="size-4"
-            />
-            {t.active}
-          </label>
-          <label className="flex items-center gap-2 pb-2 text-sm">
-            <input name="is_superuser" type="checkbox" className="size-4" />
-            {t.superuser}
-          </label>
-          <Button type="submit">{t.create}</Button>
-        </form>
-
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            {count} {t.users}
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void reload()}
-          >
-            <RefreshCw />
-            {t.refresh}
-          </Button>
-        </div>
-
-        {(message || errorText) && (
-          <p className="rounded-md border p-3 text-sm">{message ?? errorText}</p>
-        )}
-
-        {loading && users.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t.loading}</p>
-        ) : (
-          <DataTable
-            columns={columns}
-            data={users}
-            filterColumn="email"
-            filterPlaceholder={t.email}
-            emptyMessage={t.empty}
-            pageSize={5}
-          />
-        )}
+        <DataTable<UserPublic, unknown>
+          columns={columns}
+          data={controller.data}
+          rowCount={controller.rowCount}
+          page={controller.page}
+          pageSize={controller.pageSize}
+          onPageChange={controller.onPageChange}
+          onPageSizeChange={controller.onPageSizeChange}
+          sortBy={controller.sortBy}
+          sortDir={controller.sortDir}
+          onSortChange={controller.onSortChange}
+          q={controller.q}
+          onSearchChange={controller.onSearchChange}
+          loading={loading && users.length === 0}
+          getRowId={(user) => user.id}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          labels={{
+            loading: t.loading,
+            empty: t.empty,
+            toolbar: { search: t.search },
+          }}
+          addButton={
+            <Button type="button" size="sm" onClick={openCreate}>
+              <UserPlus className="size-4" />
+              {t.create}
+            </Button>
+          }
+          selectionActions={
+            selectedIds.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                onClick={() => setBulkDelete(true)}
+              >
+                {t.deleteSelected} ({selectedIds.length})
+              </Button>
+            ) : null
+          }
+        />
       </CardContent>
+
+      {/* Create popup */}
+      <EntityFormDialog
+        open={creating}
+        onOpenChange={setCreating}
+        title={t.createTitle}
+        description={t.updateScope}
+      >
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="admin-create-email">{t.email}</Label>
+              <Input
+                id="admin-create-email"
+                type="email"
+                required
+                value={createForm.email}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="admin-create-name">{t.fullName}</Label>
+              <Input
+                id="admin-create-name"
+                value={createForm.full_name}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    full_name: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="admin-create-avatar">{t.avatar}</Label>
+              <Input
+                id="admin-create-avatar"
+                type="url"
+                placeholder={t.avatarPlaceholder}
+                value={createForm.avatar}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    avatar: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="admin-create-password">{t.password}</Label>
+              <Input
+                id="admin-create-password"
+                type="password"
+                minLength={8}
+                required
+                value={createForm.password}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    password: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="admin-create-role">{t.role}</Label>
+              <RoleSelect
+                id="admin-create-role"
+                value={createForm.role}
+                onChange={(role) => setCreateForm((prev) => ({ ...prev, role }))}
+              />
+            </div>
+            <div className="flex items-end gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={createForm.is_active}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      is_active: event.target.checked,
+                    }))
+                  }
+                />
+                {t.active}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={createForm.is_superuser}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      is_superuser: event.target.checked,
+                    }))
+                  }
+                />
+                {t.superuser}
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCreating(false)}
+            >
+              {t.cancel}
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {t.save}
+            </Button>
+          </DialogFooter>
+        </form>
+      </EntityFormDialog>
+
+      {/* Edit popup */}
+      <EntityFormDialog
+        open={Boolean(editing) && Boolean(editForm)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditing(null);
+            setEditForm(null);
+          }
+        }}
+        title={t.editTitle}
+        description={editing?.email}
+      >
+        {editForm ? (
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="admin-edit-email">{t.email}</Label>
+                <Input
+                  id="admin-edit-email"
+                  type="email"
+                  required
+                  value={editForm.email}
+                  onChange={(event) =>
+                    setEditForm((prev) =>
+                      prev ? { ...prev, email: event.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="admin-edit-name">{t.fullName}</Label>
+                <Input
+                  id="admin-edit-name"
+                  value={editForm.full_name}
+                  onChange={(event) =>
+                    setEditForm((prev) =>
+                      prev ? { ...prev, full_name: event.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="admin-edit-avatar">{t.avatar}</Label>
+                <Input
+                  id="admin-edit-avatar"
+                  type="url"
+                  placeholder={t.avatarPlaceholder}
+                  value={editForm.avatar}
+                  onChange={(event) =>
+                    setEditForm((prev) =>
+                      prev ? { ...prev, avatar: event.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="admin-edit-password">{t.password}</Label>
+                <Input
+                  id="admin-edit-password"
+                  type="password"
+                  disabled={editingGoogle}
+                  placeholder={
+                    editingGoogle
+                      ? t.passwordUnsupported
+                      : t.passwordPlaceholder
+                  }
+                  value={editForm.password}
+                  onChange={(event) =>
+                    setEditForm((prev) =>
+                      prev ? { ...prev, password: event.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="admin-edit-role">{t.role}</Label>
+                <RoleSelect
+                  id="admin-edit-role"
+                  value={editForm.role}
+                  onChange={(role) =>
+                    setEditForm((prev) => (prev ? { ...prev, role } : prev))
+                  }
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditing(null);
+                  setEditForm(null);
+                }}
+              >
+                {t.cancel}
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {t.save}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : null}
+      </EntityFormDialog>
+
+      {/* Delete confirmations */}
+      <ConfirmDeleteDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title={t.confirmDeleteTitle}
+        description={t.confirmDeleteBody}
+        confirmLabel={t.delete}
+        cancelLabel={t.cancel}
+        pending={submitting}
+        onConfirm={() => deleting && confirmDelete([deleting.id])}
+      />
+      <ConfirmDeleteDialog
+        open={bulkDelete}
+        onOpenChange={setBulkDelete}
+        title={t.confirmDeleteTitle}
+        description={t.confirmDeleteBody}
+        confirmLabel={t.deleteSelected}
+        cancelLabel={t.cancel}
+        pending={submitting}
+        onConfirm={() => confirmDelete(selectedIds)}
+      />
     </Card>
   );
 }
 
-export function AdminUsersPanel({ labels }: { labels?: Partial<AdminUsersPanelLabels> }) {
+export function AdminUsersPanel({
+  labels,
+}: {
+  labels?: Partial<AdminUsersPanelLabels>;
+}) {
   const t = { ...DEFAULT_LABELS, ...labels };
   // Superuser-only: gate the whole panel via the package's RequireRole so the
   // privileged API calls never mount for non-superusers, even if a consumer

@@ -85,11 +85,42 @@
       ]
     },
     {
+      "name": "account-crud",
+      "type": "registry:component",
+      "title": "Account CRUD Helpers",
+      "description": "Shared skin helpers for the fa-auth account panels: a client-side controller for the canonical astro-ui-m8 data-table, a popup form dialog, a delete-confirmation alert, the fixed row-actions cell, and the bottom-right toast host.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": [
+        "button",
+        "dialog",
+        "alert-dialog",
+        "./node_modules/@mano8/astro-ui-m8/registry/r/data-table.json",
+        "./node_modules/@mano8/astro-ui-m8/registry/r/toast-notification.json"
+      ],
+      "files": [
+        {
+          "path": "registry/blocks/account/account-crud.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/account-crud.tsx"
+        }
+      ]
+    },
+    {
       "name": "api-keys-panel",
       "type": "registry:component",
       "title": "Account API Keys Panel",
-      "description": "fa-auth API token mint/revoke panel driven by the package's useApiKeys hook. Requires @mano8/astro-auth-m8 installed.",
-      "registryDependencies": ["card", "button", "input", "label"],
+      "description": "fa-auth API token mint/revoke panel on the canonical data-table (page selector, orderable columns, column visibility), with popup create form, alert-dialog revoke confirm, and bottom-right toasts. Driven by the package's useApiKeys hook. Requires @mano8/astro-auth-m8 installed.",
+      "dependencies": ["lucide-react", "@tanstack/react-table"],
+      "registryDependencies": [
+        "card",
+        "button",
+        "input",
+        "label",
+        "badge",
+        "dialog",
+        "./node_modules/@mano8/astro-ui-m8/registry/r/data-table.json",
+        "./account-crud.json"
+      ],
       "files": [
         {
           "path": "registry/blocks/account/api-keys-panel.tsx",
@@ -102,14 +133,17 @@
       "name": "admin-users-panel",
       "type": "registry:component",
       "title": "Admin Users Panel",
-      "description": "fa-auth superuser-only user management (create/update/delete), gated by the package's RequireRole and driven by useUsers. Requires @mano8/astro-auth-m8 installed.",
-      "dependencies": ["lucide-react"],
+      "description": "fa-auth superuser-only user management on the canonical data-table (page selector, orderable columns, column visibility), with popup create/edit forms, alert-dialog delete confirm, and bottom-right toasts. Gated by the package's RequireRole and driven by useUsers. Requires @mano8/astro-auth-m8 installed.",
+      "dependencies": ["lucide-react", "@tanstack/react-table"],
       "registryDependencies": [
         "card",
         "button",
         "input",
         "label",
-        "./node_modules/@mano8/astro-ui-m8/registry/r/data-table.json"
+        "badge",
+        "dialog",
+        "./node_modules/@mano8/astro-ui-m8/registry/r/data-table.json",
+        "./account-crud.json"
       ],
       "files": [
         {

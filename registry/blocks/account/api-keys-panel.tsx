@@ -6,12 +6,18 @@
 // This file is only the shadcn skin, copied into the consumer via the
 // @fa-m8-auth registry — edit (and translate via `labels`) freely per app.
 import * as React from "react";
+import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
+import { KeyRound, Trash2 } from "lucide-react";
 import { useApiKeys } from "@mano8/astro-auth-m8/hooks";
-import { ApiKeyCreateSchema } from "@mano8/astro-auth-m8/schemas";
+import {
+  ApiKeyCreateSchema,
+  type ApiKeyPublic,
+} from "@mano8/astro-auth-m8/schemas";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -19,8 +25,31 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DataTable,
+  createDataTableSelectionColumn,
+} from "@/components/m8-ui/data-table";
+import { DataTableColumnHeader } from "@/components/m8-ui/data-table-column-header";
+import {
+  AccountToastHost,
+  accountToast,
+  ConfirmDeleteDialog,
+  EntityFormDialog,
+  errorMessage,
+  useClientTable,
+} from "./account-crud";
 
 export interface ApiKeysPanelLabels {
+  title: string;
+  description: string;
   createTitle: string;
   createDescription: string;
   name: string;
@@ -33,24 +62,40 @@ export interface ApiKeysPanelLabels {
   defaultName: string;
   generating: string;
   mint: string;
+  cancel: string;
   securityNotice: string;
+  revealTitle: string;
   copied: string;
   copy: string;
+  done: string;
   activeTitle: string;
   loading: string;
   empty: string;
   active: string;
   revoked: string;
+  status: string;
   expires: string;
   lastUsed: string;
   notUsed: string;
   notAvailable: string;
   revoke: string;
+  revokeSelected: string;
+  confirmRevokeTitle: string;
+  confirmRevokeBody: string;
+  actions: string;
+  search: string;
+  created: string;
+  createFailed: string;
+  revokedOk: string;
+  revokeFailed: string;
 }
 
 const DEFAULT_LABELS: ApiKeysPanelLabels = {
+  title: "API keys",
+  description: "Provision and revoke programmatic client identifiers.",
   createTitle: "Create API token",
-  createDescription: "Provision programmatic client identifiers for remote integrations.",
+  createDescription:
+    "Provision programmatic client identifiers for remote integrations.",
   name: "Token name",
   namePlaceholder: "e.g. CI/CD deployment server",
   ttl: "Validity",
@@ -61,155 +106,377 @@ const DEFAULT_LABELS: ApiKeysPanelLabels = {
   defaultName: "Default key",
   generating: "Generating...",
   mint: "Mint new key",
-  securityNotice: "Security notice: copy this API key now. It will not be shown again.",
+  cancel: "Cancel",
+  securityNotice:
+    "Security notice: copy this API key now. It will not be shown again.",
+  revealTitle: "API token created",
   copied: "Copied",
   copy: "Copy",
+  done: "Done",
   activeTitle: "Active credentials",
   loading: "Loading API tokens...",
   empty: "No active API tokens found.",
   active: "Active",
   revoked: "Revoked",
+  status: "Status",
   expires: "Expires",
   lastUsed: "Last used",
   notUsed: "Never used",
   notAvailable: "n/a",
-  revoke: "Revoke token",
+  revoke: "Revoke",
+  revokeSelected: "Revoke selected",
+  confirmRevokeTitle: "Revoke API token?",
+  confirmRevokeBody:
+    "This immediately invalidates the token. Integrations using it will stop working.",
+  actions: "Actions",
+  search: "Search tokens",
+  created: "API token created.",
+  createFailed: "Failed to create API token.",
+  revokedOk: "API token revoked.",
+  revokeFailed: "Failed to revoke API token.",
 };
 
 // Backend currently accepts whole-hour TTLs only; sub-hour units need an auth-API change.
 const TTL_UNIT_HOURS = { hours: 1, days: 24, weeks: 168 } as const;
 type TtlUnit = keyof typeof TTL_UNIT_HOURS;
-const inputClassName =
-  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40";
+
+function formatDate(value: string | null | undefined, fallback: string): string {
+  return value ? new Date(value).toLocaleString() : fallback;
+}
 
 export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> }) {
   const t = { ...DEFAULT_LABELS, ...labels };
-  const { apiKeys: keys, loading, reload, create, createdKey: lastCreated, revoke } = useApiKeys(false);
-  const [isCreating, setIsCreating] = React.useState(false);
+  const {
+    apiKeys: keys,
+    loading,
+    reload,
+    create,
+    createdKey: lastCreated,
+    revoke,
+  } = useApiKeys(false);
+
+  const [creating, setCreating] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [ttlAmount, setTtlAmount] = React.useState("30");
+  const [ttlUnit, setTtlUnit] = React.useState<TtlUnit>("days");
+
+  const [revealOpen, setRevealOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+
+  const [revoking, setRevoking] = React.useState<ApiKeyPublic | null>(null);
+  const [bulkRevoke, setBulkRevoke] = React.useState(false);
+  const [isRevoking, setIsRevoking] = React.useState(false);
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
   React.useEffect(() => {
     reload().catch(() => {});
   }, [reload]);
 
-  const handleCreateToken = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setCopied(false);
-    const form = e.currentTarget;
-    const formData = new FormData(form);
+  const openCreate = () => {
+    setName("");
+    setTtlAmount("30");
+    setTtlUnit("days");
+    setCreating(true);
+  };
 
-    const amount = Number(formData.get("ttl_amount")) || 1;
-    const unit = (formData.get("ttl_unit")?.toString() as TtlUnit) || "days";
-    const ttl_hours = Math.max(1, Math.round(amount * (TTL_UNIT_HOURS[unit] ?? 24)));
-
-    const parsedData = ApiKeyCreateSchema.parse({
-      name: formData.get("name")?.toString() || t.defaultName,
-      ttl_hours,
+  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const ttlHours = Math.max(
+      1,
+      Math.round((Number(ttlAmount) || 1) * TTL_UNIT_HOURS[ttlUnit]),
+    );
+    const parsed = ApiKeyCreateSchema.safeParse({
+      name: name.trim() || t.defaultName,
+      ttl_hours: ttlHours,
     });
-
-    setIsCreating(true);
+    if (!parsed.success) {
+      accountToast.error({
+        title: parsed.error.issues[0]?.message ?? t.createFailed,
+      });
+      return;
+    }
+    setIsSubmitting(true);
     try {
-      await create(parsedData);
-      form.reset();
+      await create(parsed.data);
+      setCreating(false);
+      setCopied(false);
+      setRevealOpen(true);
+      accountToast.success({ title: t.created });
+    } catch (error) {
+      accountToast.error({ title: errorMessage(error, t.createFailed) });
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard?.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const confirmRevoke = async (ids: string[]) => {
+    setIsRevoking(true);
+    try {
+      for (const id of ids) {
+        await revoke(id);
+      }
+      accountToast.success({ title: t.revokedOk });
+      setRevoking(null);
+      setBulkRevoke(false);
+      setRowSelection({});
+    } catch (error) {
+      accountToast.error({ title: errorMessage(error, t.revokeFailed) });
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
+  const controller = useClientTable(keys, {
+    search: (key) => key.name,
+    sorters: {
+      name: (key) => key.name,
+      status: (key) => (key.revoked ? t.revoked : t.active),
+      expires: (key) => key.expires_at ?? "",
+      lastUsed: (key) => key.last_used_at ?? "",
+    },
+    initialSortBy: "name",
+  });
+
+  const columns = React.useMemo<ColumnDef<ApiKeyPublic>[]>(
+    () => [
+      createDataTableSelectionColumn<ApiKeyPublic>({
+        selectAllVisible: t.actions,
+        selectRow: (key) => `${t.revoke} ${key.name}`,
+      }),
+      {
+        id: "actions",
+        header: t.actions,
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2" data-account-row-actions="">
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={row.original.revoked}
+              onClick={() => setRevoking(row.original)}
+              data-account-action="revoke"
+            >
+              <Trash2 className="size-3.5" />
+              <span className="sr-only lg:not-sr-only">{t.revoke}</span>
+            </Button>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "name",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.name} />
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.status} />
+        ),
+        cell: ({ row }) =>
+          row.original.revoked ? (
+            <Badge variant="outline">{t.revoked}</Badge>
+          ) : (
+            <Badge>{t.active}</Badge>
+          ),
+      },
+      {
+        accessorKey: "expires",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.expires} />
+        ),
+        cell: ({ row }) => formatDate(row.original.expires_at, t.notAvailable),
+      },
+      {
+        accessorKey: "lastUsed",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.lastUsed} />
+        ),
+        cell: ({ row }) => formatDate(row.original.last_used_at, t.notUsed),
+      },
+    ],
+    [t],
+  );
+
+  // A token has no editable fields — both row actions revoke, and a single
+  // confirm dialog covers the individual revoke path.
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
   return (
-    <div className="not-content space-y-6">
+    <div className="not-content w-full space-y-6">
+      <AccountToastHost />
       <Card>
         <CardHeader>
-          <CardTitle>{t.createTitle}</CardTitle>
-          <CardDescription>{t.createDescription}</CardDescription>
+          <CardTitle>{t.activeTitle}</CardTitle>
+          <CardDescription>{t.description}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCreateToken} className="flex flex-wrap items-end gap-4">
-            <div className="flex-1 min-w-[200px] space-y-1">
-              <Label htmlFor="name" className="pb-2">{t.name}</Label>
-              <Input id="name" name="name" placeholder={t.namePlaceholder} required />
+          <DataTable<ApiKeyPublic, unknown>
+            columns={columns}
+            data={controller.data}
+            rowCount={controller.rowCount}
+            page={controller.page}
+            pageSize={controller.pageSize}
+            onPageChange={controller.onPageChange}
+            onPageSizeChange={controller.onPageSizeChange}
+            sortBy={controller.sortBy}
+            sortDir={controller.sortDir}
+            onSortChange={controller.onSortChange}
+            q={controller.q}
+            onSearchChange={controller.onSearchChange}
+            loading={loading && keys.length === 0}
+            getRowId={(key) => key.id}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            labels={{
+              loading: t.loading,
+              empty: t.empty,
+              toolbar: { search: t.search },
+            }}
+            addButton={
+              <Button type="button" size="sm" onClick={openCreate}>
+                <KeyRound className="size-4" />
+                {t.mint}
+              </Button>
+            }
+            selectionActions={
+              selectedIds.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setBulkRevoke(true)}
+                >
+                  {t.revokeSelected} ({selectedIds.length})
+                </Button>
+              ) : null
+            }
+          />
+        </CardContent>
+      </Card>
+
+      {/* Create token popup */}
+      <EntityFormDialog
+        open={creating}
+        onOpenChange={setCreating}
+        title={t.createTitle}
+        description={t.createDescription}
+      >
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="api-key-name">{t.name}</Label>
+            <Input
+              id="api-key-name"
+              aria-label={t.name}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t.namePlaceholder}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="api-key-ttl">{t.ttl}</Label>
+              <Input
+                id="api-key-ttl"
+                type="number"
+                min={1}
+                value={ttlAmount}
+                onChange={(event) => setTtlAmount(event.target.value)}
+              />
             </div>
-            <div className="w-24 space-y-1">
-              <Label htmlFor="ttl_amount" className="pb-2">{t.ttl}</Label>
-              <Input id="ttl_amount" name="ttl_amount" type="number" min={1} defaultValue="30" required />
-            </div>
-            <div className="w-32 space-y-1">
-              <Label htmlFor="ttl_unit" className="pb-2">{t.ttlUnit}</Label>
+            <div className="space-y-1">
+              <Label htmlFor="api-key-unit">{t.ttlUnit}</Label>
               <select
-                id="ttl_unit"
-                name="ttl_unit"
-                defaultValue="days"
-                className={inputClassName}
+                id="api-key-unit"
+                aria-label={t.ttlUnit}
+                value={ttlUnit}
+                onChange={(event) => setTtlUnit(event.target.value as TtlUnit)}
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <option value="hours">{t.unitHours}</option>
                 <option value="days">{t.unitDays}</option>
                 <option value="weeks">{t.unitWeeks}</option>
               </select>
             </div>
-            <Button type="submit" disabled={isCreating}>
-              {isCreating ? t.generating : t.mint}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCreating(false)}
+            >
+              {t.cancel}
             </Button>
-          </form>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? t.generating : t.mint}
+            </Button>
+          </DialogFooter>
+        </form>
+      </EntityFormDialog>
 
-          {lastCreated && (
-            <div className="mt-4 p-4 border border-amber-200 bg-amber-50 rounded-md text-amber-900 space-y-2">
-              <p className="text-sm font-bold">{t.securityNotice}</p>
-              <div className="flex items-center gap-2 bg-white p-2 rounded border font-mono text-xs overflow-x-auto">
-                <span className="flex-1 select-all break-all">{lastCreated.plaintext}</span>
-                <Button size="sm" variant="ghost" onClick={() => handleCopy(lastCreated.plaintext)}>
-                  {copied ? t.copied : t.copy}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* One-time plaintext reveal */}
+      <Dialog
+        open={revealOpen && Boolean(lastCreated)}
+        onOpenChange={setRevealOpen}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t.revealTitle}</DialogTitle>
+            <DialogDescription>{t.securityNotice}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 overflow-x-auto rounded-md border bg-muted/40 p-2 font-mono text-xs">
+            <span className="flex-1 select-all break-all">
+              {lastCreated?.plaintext}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => lastCreated && handleCopy(lastCreated.plaintext)}
+            >
+              {copied ? t.copied : t.copy}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setRevealOpen(false)}>
+              {t.done}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.activeTitle}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading && keys.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2 italic">{t.loading}</p>
-          ) : keys.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2 italic">{t.empty}</p>
-          ) : (
-            <div className="divide-y divide-border">
-              {keys.map((key) => (
-                <div key={key.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-semibold">{key.name}</h4>
-                    <p className="text-xs text-muted-foreground">
-                      {t.expires}: {key.expires_at ? new Date(key.expires_at).toLocaleString() : t.notAvailable}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t.lastUsed}: {key.last_used_at ? new Date(key.last_used_at).toLocaleString() : t.notUsed}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {key.revoked ? t.revoked : t.active}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    disabled={key.revoked}
-                    onClick={() => revoke(key.id)}
-                  >
-                    {t.revoke}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Revoke confirmations */}
+      <ConfirmDeleteDialog
+        open={Boolean(revoking)}
+        onOpenChange={(open) => {
+          if (!open) setRevoking(null);
+        }}
+        title={t.confirmRevokeTitle}
+        description={t.confirmRevokeBody}
+        confirmLabel={t.revoke}
+        cancelLabel={t.cancel}
+        pending={isRevoking}
+        onConfirm={() => revoking && confirmRevoke([revoking.id])}
+      />
+      <ConfirmDeleteDialog
+        open={bulkRevoke}
+        onOpenChange={setBulkRevoke}
+        title={t.confirmRevokeTitle}
+        description={t.confirmRevokeBody}
+        confirmLabel={t.revokeSelected}
+        cancelLabel={t.cancel}
+        pending={isRevoking}
+        onConfirm={() => confirmRevoke(selectedIds)}
+      />
     </div>
   );
 }
