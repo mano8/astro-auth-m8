@@ -199,6 +199,9 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
     setIsSubmitting(true);
     try {
       await create(parsed.data);
+      // The hook query is disabled (useApiKeys(false)), so invalidation alone
+      // won't repopulate the table — refetch explicitly.
+      await reload();
       setCreating(false);
       setCopied(false);
       setRevealOpen(true);
@@ -222,6 +225,7 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
       for (const id of ids) {
         await revoke(id);
       }
+      await reload();
       accountToast.success({ title: t.revokedOk });
       setRevoking(null);
       setBulkRevoke(false);

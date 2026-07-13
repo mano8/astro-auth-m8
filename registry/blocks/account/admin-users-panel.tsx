@@ -250,6 +250,9 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
     setSubmitting(true);
     try {
       await create(parsed.data);
+      // The hook query is disabled (useUsers(false)), so invalidation alone
+      // won't repopulate the table — refetch explicitly.
+      await reload();
       setCreating(false);
       accountToast.success({ title: t.created });
     } catch (error) {
@@ -278,6 +281,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
     setSubmitting(true);
     try {
       await update(editing.id, parsed.data);
+      await reload();
       setEditing(null);
       setEditForm(null);
       accountToast.success({ title: t.updated });
@@ -294,6 +298,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
       for (const id of ids) {
         await remove(id);
       }
+      await reload();
       accountToast.success({ title: t.deleted });
       setDeleting(null);
       setBulkDelete(false);
