@@ -316,7 +316,7 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
   const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
 
   return (
-    <div className="not-content w-full space-y-6">
+    <div className="not-content flex w-full flex-col gap-6">
       <AccountToastHost />
       <Card>
         <CardHeader>

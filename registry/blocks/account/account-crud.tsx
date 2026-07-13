@@ -247,12 +247,12 @@ export function ConfirmDeleteDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
+            variant="destructive"
             disabled={pending}
             onClick={(event) => {
               event.preventDefault();
               onConfirm();
             }}
-            className="bg-destructive text-white hover:bg-destructive/90"
           >
             {confirmLabel}
           </AlertDialogAction>

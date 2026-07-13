@@ -108,7 +108,7 @@ export function DashboardOverview({
   }
 
   return (
-    <div className="not-content space-y-6">
+    <div className="not-content flex flex-col gap-6">
       <div className="space-y-1">
         <h2 className="text-xl font-semibold tracking-tight">{t.title}</h2>
         <p className="text-sm text-muted-foreground">{t.subtitle}</p>
