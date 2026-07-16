@@ -1,6 +1,8 @@
 # astro-auth-m8
 
 ![CI/CD](https://github.com/mano8/astro-auth-m8/actions/workflows/CI.yaml/badge.svg?branch=main)
+[![codecov](https://codecov.io/github/mano8/astro-auth-m8/graph/badge.svg?token=ZHBQDSPASI)](https://codecov.io/github/mano8/astro-auth-m8)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/f9dcb2a93b074a6289454beae553050f)](https://app.codacy.com/gh/mano8/astro-auth-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 Astro integration and headless runtime client for `fa-auth-m8`.
 
