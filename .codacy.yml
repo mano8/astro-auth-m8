@@ -1,0 +1,14 @@
+engines:
+  eslint:
+    enabled: true
+  markdownlint:
+    enabled: true
+
+exclude_paths:
+  - "coverage/**"
+  - "dist/**"
+  - "node_modules/**"
+  - "registry/r/**"
+  - "fixtures/**"
+  - ".agents/**"
+  - ".codex/**"
