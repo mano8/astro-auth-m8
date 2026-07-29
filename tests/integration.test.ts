@@ -11,13 +11,18 @@ describe("Astro integration", () => {
   it("is headless by default and wires config", () => {
     const integration = faAuth({ apiBase: "/api" });
     const injectRoute = vi.fn();
+    const injectScript = vi.fn();
     const addMiddleware = vi.fn();
     const updateConfig = vi.fn();
-    integration.hooks["astro:config:setup"]?.({ injectRoute, addMiddleware, updateConfig } as never);
+    integration.hooks["astro:config:setup"]?.({ injectRoute, injectScript, addMiddleware, updateConfig } as never);
     expect(integration.name).toBe("@mano8/astro-auth-m8");
     expect(injectRoute).not.toHaveBeenCalled();
     expect(addMiddleware).not.toHaveBeenCalled();
     expect(updateConfig).toHaveBeenCalledWith(expect.objectContaining({ vite: expect.any(Object) }));
+    expect(injectScript).toHaveBeenCalledWith(
+      "page",
+      expect.stringContaining("@mano8/astro-auth-m8/browser-adapter")
+    );
   });
 
   it("injects starter routes and optional middleware", () => {

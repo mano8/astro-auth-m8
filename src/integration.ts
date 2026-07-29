@@ -60,7 +60,7 @@ export default function faAuth(options: FaAuthAstroOptions = {}): AstroIntegrati
   return {
     name: "@mano8/astro-auth-m8",
     hooks: {
-      "astro:config:setup": ({ injectRoute, addMiddleware, updateConfig }) => {
+      "astro:config:setup": ({ injectRoute, injectScript, addMiddleware, updateConfig }) => {
         updateConfig({
           vite: {
             define: {
@@ -71,6 +71,12 @@ export default function faAuth(options: FaAuthAstroOptions = {}): AstroIntegrati
             }
           }
         });
+
+        injectScript?.(
+          "page",
+          `import { installFaAuthBrowserAdapter } from "@mano8/astro-auth-m8/browser-adapter";` +
+            `installFaAuthBrowserAdapter(${JSON.stringify({ apiBase })});`
+        );
 
         if (mode === "starter" && (options.views?.strategy ?? "package") !== "none") {
           for (const [name, pattern] of Object.entries(routes)) {
