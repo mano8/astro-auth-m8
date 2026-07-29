@@ -4,10 +4,29 @@
 
 Client (Astro authentication plugin).
 
-## Role
+## Purpose
 
 Provide the Astro integration and headless runtime client for `fa-auth-m8`. This
 is the foundation authentication plugin for `fa-ui-m8` and other M8 Astro apps.
+
+## Responsibilities
+
+- Model the public authentication contract and issue HTTP requests through the
+  package-owned runtime client.
+- Provide token handling, providers, hooks, route helpers, and optional default
+  or scaffolded UI without moving consumer-owned configuration into the package.
+- Keep published metadata and compatibility checks synchronized with the
+  supported `fa-auth-m8` service contract.
+
+## Repository boundaries
+
+- Own this package's Astro integration, headless client, schemas, runtime
+  adapter, starter routes, copied scaffold, registry skins, and tests.
+- Do not import `fa-auth-m8` service code or another optional plugin; service
+  access remains HTTP-only and other plugins use the public adapter/provider
+  surface.
+- Consumers own secrets, environment configuration, i18n labels, navigation,
+  and final UI composition.
 
 ## Backend and public contract
 
@@ -19,6 +38,12 @@ is the foundation authentication plugin for `fa-ui-m8` and other M8 Astro apps.
 - Export public modules only through explicit `package.json` subpaths.
 - Preserve the adapter and provider surface as a stable fleet boundary; breaking
   changes have fleet-wide consequences.
+
+## Package version alignment
+
+- Keep `package.json` and `package-lock.json` on the same published version.
+- When the package version changes, retain the supported `fa-auth-m8` contract
+  range unless the schemas and compatibility checks change together.
 
 ## Authentication and UI boundaries
 

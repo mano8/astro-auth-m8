@@ -80,4 +80,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm audit --audit-level=high
+      # The published package does not include dev tooling; keep this gate focused
+      # on dependencies shipped to consumers while the quality job validates ESLint.
+      - run: npm audit --omit=dev --audit-level=high
