@@ -32,6 +32,22 @@ assertFaAuthM8Compatibility(meta); // reads nested contract.version + version
 
 The helper also accepts flat fields (`auth_contract_version` / `contract_version` / `service_version`) for backends that surface metadata elsewhere.
 
+## Authorization predicates
+
+`@mano8/astro-auth-m8/authorization` is the single place this package encodes the role hierarchy and the role/`is_superuser` cross-field invariant. It mirrors the backend's canonical `auth_sdk_m8.authorization` module, so client-side gating cannot drift from what the server enforces.
+
+```ts
+import { hasMinimumRole, hasSuperuserPrivileges } from "@mano8/astro-auth-m8/authorization";
+
+// Ordered hierarchy - a higher role satisfies a lower requirement.
+hasMinimumRole(user.role, "admin"); // true for "superadmin"
+
+// Dual evidence - never decide from `role` alone or `is_superuser` alone.
+hasSuperuserPrivileges(user.role, user.is_superuser);
+```
+
+The valid role/flag pairs are `superadmin` with `is_superuser: true`, and every other role with `is_superuser: false`. `privilegeClaimsAreConsistent` exposes that invariant on its own, and `ORDERED_ROLES` exposes the hierarchy, highest privilege first. Any other pair - including an unrecognised role - grants nothing. These are display predicates; the backend stays the authority.
+
 ## Modes
 
 - `headless`: exports typed schemas, API wrappers, token handling, React provider/hooks, and route helpers without injecting pages.

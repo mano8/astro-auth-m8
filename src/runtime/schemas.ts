@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+// Declared from highest to lowest privilege: `runtime/authorization.ts` reads
+// this order as the canonical role hierarchy. Do not reorder.
 export const RoleTypeSchema = z.enum(["superadmin", "admin", "writer", "reader", "user"]);
 export type RoleType = z.infer<typeof RoleTypeSchema>;
 
