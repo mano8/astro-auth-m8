@@ -144,7 +144,6 @@ interface CreateFormState {
   password: string;
   role: string;
   is_active: boolean;
-  is_superuser: boolean;
 }
 
 interface EditFormState {
@@ -162,7 +161,6 @@ const EMPTY_CREATE: CreateFormState = {
   password: "",
   role: "user",
   is_active: true,
-  is_superuser: false,
 };
 
 const selectClassName =
@@ -239,7 +237,6 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
       provider: "password",
       role: createForm.role ? RoleTypeSchema.parse(createForm.role) : "user",
       is_active: createForm.is_active,
-      is_superuser: createForm.is_superuser,
     });
     if (!parsed.success) {
       accountToast.error({
@@ -550,20 +547,6 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
                   }
                 />
                 {t.active}
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4"
-                  checked={createForm.is_superuser}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      is_superuser: event.target.checked,
-                    }))
-                  }
-                />
-                {t.superuser}
               </label>
             </div>
           </div>

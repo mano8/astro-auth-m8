@@ -67,7 +67,6 @@ const userCreateBase = z.object({
   avatar: z.string().max(255).url().nullable().optional(),
   is_active: z.boolean().optional(),
   email_verified: z.boolean().optional(),
-  is_superuser: z.boolean().optional(),
   role: RoleTypeSchema.optional(),
   password: z.string().min(8).max(128).nullable().optional(),
   oauth_user_id: z.string().max(256).nullable().optional()

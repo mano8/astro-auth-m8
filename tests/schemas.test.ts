@@ -23,6 +23,11 @@ describe("contract schemas", () => {
     expect(ApiKeyCreateSchema.parse({}).ttl_hours).toBe(24);
   });
 
+  it("rejects is_superuser in create schema", () => {
+    expect(UserCreateSchema.safeParse({ provider: "password", email: "a@example.com", password: "password123", is_superuser: true }).success).toBe(false);
+    expect(UserCreateSchema.safeParse({ provider: "password", email: "a@example.com", password: "password123", is_superuser: false }).success).toBe(false);
+  });
+
   it("enforces password-provider create rules", () => {
     expect(UserCreateSchema.safeParse({ provider: "password", email: "a@example.com" }).success).toBe(false);
     expect(UserCreateSchema.safeParse({ provider: "password", email: "a@example.com", password: "password123" }).success).toBe(true);
