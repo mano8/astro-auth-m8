@@ -13,6 +13,7 @@ import {
   useAuth,
   type AuthContextValue,
 } from "@mano8/astro-auth-m8/react";
+import { hasSuperuserPrivileges } from "@mano8/astro-auth-m8/authorization";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -91,7 +92,7 @@ function AccountShell({
   }
 
   const visibleTabs = extraTabs.filter(
-    (tab) => !tab.superuserOnly || user.is_superuser,
+    (tab) => !tab.superuserOnly || hasSuperuserPrivileges(user.role, user.is_superuser),
   );
   const [activeTab, setActiveTab] = React.useState<string>("dashboard");
   const navItems = [

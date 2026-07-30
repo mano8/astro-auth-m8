@@ -41,7 +41,7 @@ const user = {
   is_active: true,
   email_verified: true,
   is_superuser: true,
-  role: "admin" as const
+  role: "superadmin" as const
 };
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -212,11 +212,41 @@ describe("AuthProvider and guards", () => {
     const view = render(<AuthProvider config={{ apiBase: "/api" }}><Probe /></AuthProvider>);
     await flush();
     expect(view.container.textContent).toContain("private");
+    expect(view.container.textContent).toContain("role");
+    expect(view.container.textContent).toContain("super");
     await act(async () => { await auth!.login("ada@example.com", "password"); });
     expect(authApi.login).toHaveBeenCalledWith("ada@example.com", "password");
     await act(async () => { await auth!.reload(); });
     await act(async () => { await auth!.logout(); });
     expect(authApi.logout).toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("denies superuser UI for an inconsistent role/is_superuser pair", async () => {
+    profileApi.getProfile.mockResolvedValueOnce({ ...user, role: "admin" as const, is_superuser: true });
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <RequireRole superuser fallback={<b>denied</b>}><em>super</em></RequireRole>;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user).not.toBeNull());
+    expect(view.container.textContent).toContain("denied");
+    expect(view.container.textContent).not.toContain("super");
+    view.unmount();
+  });
+
+  it("admits a superadmin to a role guard requiring a lower tier", async () => {
+    profileApi.getProfile.mockResolvedValueOnce({ ...user, role: "superadmin" as const, is_superuser: true });
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <RequireRole roles={["admin"]} fallback={<b>denied</b>}><u>role</u></RequireRole>;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user).not.toBeNull());
+    expect(view.container.textContent).toContain("role");
+    expect(view.container.textContent).not.toContain("denied");
     view.unmount();
   });
 
