@@ -43,6 +43,12 @@ export const UserPublicSchema = z.object({
 }).strict();
 export type UserPublic = z.infer<typeof UserPublicSchema>;
 
+export const UserAuthorizationUpdateSchema = UserPublicSchema.extend({
+  auth_generation: z.number().int(),
+  revocation_enqueued: z.boolean()
+}).strict();
+export type UserAuthorizationUpdate = z.infer<typeof UserAuthorizationUpdateSchema>;
+
 export const ResponseUserSchema = z.object({
   success: z.boolean(),
   user: UserPublicSchema
