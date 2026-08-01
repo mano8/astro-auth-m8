@@ -107,6 +107,7 @@ export const UserUpdateSchema = z.object({
   password: z.string().min(8).max(128).nullable().optional(),
   oauth_user_id: z.string().max(256).nullable().optional(),
   role: RoleTypeSchema.nullable().optional(),
+  is_active: z.boolean().nullable().optional(),
   provider: AuthProviderTypeSchema.nullable().optional()
 }).strict().superRefine((value, ctx) => {
   if (value.provider === "password" && value.oauth_user_id != null) {

@@ -88,6 +88,15 @@ export interface AdminUsersPanelLabels {
   confirmDeleteBody: string;
   empty: string;
   search: string;
+  activate: string;
+  deactivate: string;
+  activated: string;
+  deactivated: string;
+  activationFailed: string;
+  confirmActivateTitle: string;
+  confirmDeactivateTitle: string;
+  confirmActivateBody: string;
+  confirmDeactivateBody: string;
 }
 
 const DEFAULT_LABELS: AdminUsersPanelLabels = {
@@ -135,6 +144,17 @@ const DEFAULT_LABELS: AdminUsersPanelLabels = {
     "This permanently removes the user account and revokes its access.",
   empty: "No users found.",
   search: "Search users",
+  activate: "Activate account",
+  deactivate: "Deactivate account",
+  activated: "Account activated.",
+  deactivated: "Account deactivated.",
+  activationFailed: "Failed to change account status.",
+  confirmActivateTitle: "Activate this account?",
+  confirmDeactivateTitle: "Deactivate this account?",
+  confirmActivateBody:
+    "This bumps the account's authorization generation and revokes its active sessions, so any browser signed in as this user must sign in again.",
+  confirmDeactivateBody:
+    "This bumps the account's authorization generation, revokes its active sessions, and revokes its API keys. Reactivating the account afterward does not restore the revoked keys — new keys must be issued.",
 };
 
 interface CreateFormState {
@@ -204,6 +224,8 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
   const [editForm, setEditForm] = React.useState<EditFormState | null>(null);
   const [deleting, setDeleting] = React.useState<UserPublic | null>(null);
   const [bulkDelete, setBulkDelete] = React.useState(false);
+  const [activationTarget, setActivationTarget] =
+    React.useState<UserPublic | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
@@ -284,6 +306,25 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
       accountToast.success({ title: t.updated });
     } catch (error) {
       accountToast.error({ title: errorMessage(error, t.updateFailed) });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmActivation = async () => {
+    if (!activationTarget) return;
+    setSubmitting(true);
+    try {
+      await update(activationTarget.id, { is_active: !activationTarget.is_active });
+      await reload();
+      accountToast.success({
+        title: activationTarget.is_active ? t.deactivated : t.activated,
+      });
+      setActivationTarget(null);
+      setEditing(null);
+      setEditForm(null);
+    } catch (error) {
+      accountToast.error({ title: errorMessage(error, t.activationFailed) });
     } finally {
       setSubmitting(false);
     }
@@ -650,6 +691,29 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
                 />
               </div>
             </div>
+
+            {/* Account status is never a bare checkbox on this form: it is an
+                authorization-state transition (generation bump, session
+                revocation, and on deactivation API-key revocation), so it goes
+                through its own focused confirmation panel below instead of
+                being bundled into the silent field save above. */}
+            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t.status}</p>
+                <Badge variant={editing?.is_active ? "default" : "outline"}>
+                  {editing?.is_active ? t.active : t.inactive}
+                </Badge>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => editing && setActivationTarget(editing)}
+              >
+                {editing?.is_active ? t.deactivate : t.activate}
+              </Button>
+            </div>
+
             <DialogFooter>
               <Button
                 type="button"
@@ -691,6 +755,32 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
         cancelLabel={t.cancel}
         pending={submitting}
         onConfirm={() => confirmDelete(selectedIds)}
+      />
+
+      {/* Activation/deactivation confirmation - the sole path that can change
+          is_active; see the status control above for why this is never a bare
+          checkbox. */}
+      <ConfirmDeleteDialog
+        open={Boolean(activationTarget)}
+        onOpenChange={(open) => {
+          if (!open) setActivationTarget(null);
+        }}
+        title={
+          activationTarget?.is_active
+            ? t.confirmDeactivateTitle
+            : t.confirmActivateTitle
+        }
+        description={
+          activationTarget?.is_active
+            ? t.confirmDeactivateBody
+            : t.confirmActivateBody
+        }
+        confirmLabel={
+          activationTarget?.is_active ? t.deactivate : t.activate
+        }
+        cancelLabel={t.cancel}
+        pending={submitting}
+        onConfirm={confirmActivation}
       />
     </Card>
   );

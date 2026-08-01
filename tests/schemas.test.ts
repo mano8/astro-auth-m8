@@ -72,6 +72,13 @@ describe("contract schemas", () => {
     expect(UserUpdateSchema.safeParse({ provider: "google", oauth_user_id: "google-1", role: "admin" }).success).toBe(true);
   });
 
+  it("accepts is_active on update to make account activation reachable, rejects a non-boolean value", () => {
+    expect(UserUpdateSchema.safeParse({ is_active: false }).success).toBe(true);
+    expect(UserUpdateSchema.safeParse({ is_active: true }).success).toBe(true);
+    expect(UserUpdateSchema.safeParse({ is_active: null }).success).toBe(true);
+    expect(UserUpdateSchema.safeParse({ is_active: "false" }).success).toBe(false);
+  });
+
   it("parses the fa-auth-m8@2.0.0 role-change response (auth_generation + revocation_enqueued)", () => {
     const result = UserAuthorizationUpdateSchema.safeParse({
       id: "4a9f083a-b23b-4823-9aa2-0d01875c4216",
