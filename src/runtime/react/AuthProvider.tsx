@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { configureAuth, type AuthRuntimeConfig } from "../config.js";
 import { login as apiLogin, logout as apiLogout, refreshToken } from "../api/auth.js";
 import { getProfile } from "../api/profile.js";
+import { AUTH_REVOCATION_EVENT, type AuthRevocationDetail } from "../authEvents.js";
 import type { UserPublic } from "../schemas.js";
 import { AuthQueryProvider } from "./AuthQueryProvider.js";
 
@@ -19,11 +20,13 @@ const AUTH_SESSION_EVENT = "fa-auth-m8:session";
 const BOOTSTRAP_FAILURE_COOLDOWN_MS = 30_000;
 
 type AuthSessionEvent = CustomEvent<{ user: UserPublic | null }>;
+type AuthRevocationEvent = CustomEvent<AuthRevocationDetail>;
 
 let bootstrapSessionPromise: Promise<UserPublic | null> | null = null;
 let bootstrapFailureUntil = 0;
 
 function emitAuthSession(user: UserPublic | null) {
+  /* v8 ignore next -- SSR guard: only reachable if this module runs outside a browser, which the jsdom test environment cannot simulate without corrupting the DOM globals it also depends on (see client.ts's analogous guard, tested via a separate non-jsdom file instead) */
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT, { detail: { user } }));
 }
@@ -110,6 +113,29 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
       cancelled = true;
     };
   }, [bootstrap, reload]);
+
+  // AA-11: `revocation_enqueued: true` means the backend has already revoked the
+  // target principal's sessions and is propagating an authorization-generation
+  // bump. When that principal is the signed-in one, the claims held here are
+  // stale the moment the response lands, so re-read the profile now instead of
+  // waiting for whichever later call would incidentally refresh it. `loading`
+  // is raised for the duration so `RequireRole`/`RequireAuth` fall back rather
+  // than keep rendering privileged UI from the superseded claims.
+  useEffect(() => {
+    const currentUserId = user?.id;
+    if (!currentUserId) return;
+
+    const onRevocation = (event: Event) => {
+      if ((event as AuthRevocationEvent).detail?.userId !== currentUserId) return;
+      setLoading(true);
+      void reload().finally(() => setLoading(false));
+    };
+
+    window.addEventListener(AUTH_REVOCATION_EVENT, onRevocation);
+    return () => {
+      window.removeEventListener(AUTH_REVOCATION_EVENT, onRevocation);
+    };
+  }, [reload, user?.id]);
 
   const login = useCallback(async (username: string, password: string) => {
     await apiLogin(username, password);

@@ -32,7 +32,9 @@ import type { DataTableSortDirection } from "@/components/m8-ui/data-table";
 import {
   ToastNotificationHost,
   toastNotification,
+  type ToastNotification,
 } from "@/components/m8-ui/toast-notification";
+import { describeApiError } from "@mano8/astro-auth-m8/errors";
 
 // Bottom-right toast host + helpers for every account surface. Mount the host
 // once in the account shell; call `accountToast.success/error/info` from
@@ -262,6 +264,6 @@ export function ConfirmDeleteDialog({
   );
 }
 
-export function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
+export function errorMessage(error: unknown, fallback: string): ToastNotification {
+  return describeApiError(error, fallback);
 }

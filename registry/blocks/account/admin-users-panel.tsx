@@ -275,7 +275,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
       setCreating(false);
       accountToast.success({ title: t.created });
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.createFailed) });
+      accountToast.error(errorMessage(error, t.createFailed));
     } finally {
       setSubmitting(false);
     }
@@ -305,7 +305,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
       setEditForm(null);
       accountToast.success({ title: t.updated });
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.updateFailed) });
+      accountToast.error(errorMessage(error, t.updateFailed));
     } finally {
       setSubmitting(false);
     }
@@ -324,7 +324,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
       setEditing(null);
       setEditForm(null);
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.activationFailed) });
+      accountToast.error(errorMessage(error, t.activationFailed));
     } finally {
       setSubmitting(false);
     }
@@ -342,7 +342,7 @@ function AdminUsersPanelInner({ t }: { t: AdminUsersPanelLabels }) {
       setBulkDelete(false);
       setRowSelection({});
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.deleteFailed) });
+      accountToast.error(errorMessage(error, t.deleteFailed));
     } finally {
       setSubmitting(false);
     }

@@ -7,8 +7,9 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 
 const authApi = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), refreshToken: vi.fn() }));
 const profileApi = vi.hoisted(() => ({ deleteProfile: vi.fn(), getProfile: vi.fn(), updatePassword: vi.fn(), updateProfile: vi.fn() }));
-const apiKeyApi = vi.hoisted(() => ({ listApiKeys: vi.fn(), createApiKey: vi.fn(), revokeApiKey: vi.fn() }));
+const apiKeyApi = vi.hoisted(() => ({ listApiKeys: vi.fn(), createApiKey: vi.fn(), revokeApiKey: vi.fn(), adminListUserApiKeys: vi.fn(), adminRevokeApiKey: vi.fn() }));
 const dashboardApi = vi.hoisted(() => ({ getGlobalActivity: vi.fn(), getUserActivity: vi.fn() }));
+const securityApi = vi.hoisted(() => ({ getAuditLog: vi.fn(), purgeAuditLog: vi.fn(), purgeApiKeys: vi.fn() }));
 const sessionApi = vi.hoisted(() => ({ getCurrentSession: vi.fn(), listSessions: vi.fn(), revokeSession: vi.fn() }));
 const userApi = vi.hoisted(() => ({ createUser: vi.fn(), deleteUser: vi.fn(), getUser: vi.fn(), listUsers: vi.fn(), signupUser: vi.fn(), updateUser: vi.fn() }));
 const oauthApi = vi.hoisted(() => ({ createPkcePair: vi.fn(), getGoogleLoginUrl: vi.fn(), savePkceVerifier: vi.fn(), exchangeGoogleCode: vi.fn(), takePkceVerifier: vi.fn() }));
@@ -17,16 +18,18 @@ vi.mock("../src/runtime/api/auth.js", () => authApi);
 vi.mock("../src/runtime/api/profile.js", () => profileApi);
 vi.mock("../src/runtime/api/apiKeys.js", () => apiKeyApi);
 vi.mock("../src/runtime/api/dashboard.js", () => dashboardApi);
+vi.mock("../src/runtime/api/security.js", () => securityApi);
 vi.mock("../src/runtime/api/sessions.js", () => sessionApi);
 vi.mock("../src/runtime/api/users.js", () => userApi);
 vi.mock("../src/runtime/api/oauth.js", () => oauthApi);
 
-import { AuthProvider, AuthQueryProvider, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
-import { AccountView, CallbackView, LoginView, SignupView } from "../src/runtime/react/default-ui/index.js";
-import { useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
+import { AUTH_REVOCATION_EVENT, AuthProvider, AuthQueryProvider, emitAuthRevocation, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
+import { AccountView, CallbackView, LoginForm, LoginView, SignupView, StarterAccountPage, StarterLoginPage } from "../src/runtime/react/default-ui/index.js";
+import { useAdminApiKeys, useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
 import { useDashboard } from "../src/runtime/hooks/useDashboard.js";
 import { useGoogleLogin } from "../src/runtime/hooks/useGoogleLogin.js";
 import { useProfile } from "../src/runtime/hooks/useProfile.js";
+import { useAuditLog, useSecurityPurges } from "../src/runtime/hooks/useSecurity.js";
 import { useSessions } from "../src/runtime/hooks/useSessions.js";
 import { useUsers } from "../src/runtime/hooks/useUsers.js";
 import { authKeys } from "../src/runtime/queryKeys.js";
@@ -120,6 +123,17 @@ beforeEach(() => {
   apiKeyApi.listApiKeys.mockResolvedValue([{ id: "11111111-1111-4111-8111-111111111112", name: "key", expires_at: null, revoked: false, last_used_at: null }]);
   apiKeyApi.createApiKey.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111113", name: "new", expires_at: null, revoked: false, last_used_at: null, plaintext: "secret" });
   apiKeyApi.revokeApiKey.mockResolvedValue({ message: "revoked" });
+  apiKeyApi.adminListUserApiKeys.mockResolvedValue({
+    data: [{ id: "11111111-1111-4111-8111-111111111115", name: "admin-key", user_id: user.id, revoked: false, expires_at: null, last_used_at: null, created_at: "2026-06-15T00:00:00Z", access_mode: "read_only", status: "active", audiences: [] }],
+    count: 1
+  });
+  apiKeyApi.adminRevokeApiKey.mockResolvedValue({ message: "revoked" });
+  securityApi.getAuditLog.mockResolvedValue({
+    data: [{ id: "11111111-1111-4111-8111-111111111116", created_at: "2026-06-15T00:00:00Z", actor_user_id: user.id, actor_role: "superadmin", action: "delete", table_name: "m8_api_key", row_pk: "11111111-1111-4111-8111-111111111115", target_owner_id: user.id }],
+    count: 1
+  });
+  securityApi.purgeAuditLog.mockResolvedValue({ window: "1m", removed: 3 });
+  securityApi.purgeApiKeys.mockResolvedValue({ window: "1m", removed: 2 });
   dashboardApi.getUserActivity.mockResolvedValue({ nb_users: 1, activity: { min: 0, max: 1, activity: [] } });
   dashboardApi.getGlobalActivity.mockResolvedValue({ nb_users: 2, activity: { min: 0, max: 2, activity: [] } });
   sessionApi.getCurrentSession.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111114", provider: "password", user_agent: null, ip_address: null, created_at: "2026-06-25T10:00:00Z", last_seen_at: "2026-06-25T10:00:00Z", expires_at: "2026-06-26T10:00:00Z" });
@@ -250,9 +264,50 @@ describe("AuthProvider and guards", () => {
     view.unmount();
   });
 
+  it("re-reads the signed-in principal's claims when its authorization is revoked", async () => {
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <><span>{auth.user?.role ?? "none"}</span><RequireRole superuser fallback={<b>denied</b>}><em>super</em></RequireRole></>;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user).not.toBeNull());
+    expect(view.container.textContent).toContain("super");
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+
+    // The demotion the operator just applied elsewhere: the provider must pick
+    // up the new claims from the notification, not from the next incidental
+    // profile read, and the superuser UI must be gone once it has.
+    profileApi.getProfile.mockResolvedValueOnce({ ...user, role: "user" as const, is_superuser: false });
+    await act(async () => { emitAuthRevocation(user.id); });
+    await waitFor(() => expect(auth!.user?.role).toBe("user"));
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(2);
+    expect(auth!.loading).toBe(false);
+    expect(view.container.textContent).toContain("denied");
+    expect(view.container.textContent).not.toContain("super");
+    view.unmount();
+  });
+
+  it("ignores revocations aimed at another principal or carrying no detail", async () => {
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user).not.toBeNull());
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+
+    await act(async () => { emitAuthRevocation("22222222-2222-4222-8222-222222222222"); });
+    await act(async () => { window.dispatchEvent(new Event(AUTH_REVOCATION_EVENT)); });
+    await flush();
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+    expect(auth!.user?.role).toBe("superadmin");
+    view.unmount();
+  });
+
   it("handles bootstrap and reload errors, disabled bootstrap, fallback branches, and missing provider", async () => {
     profileApi.getProfile.mockRejectedValueOnce(new Error("profile failed"));
-    authApi.refreshToken.mockRejectedValueOnce(new Error("refresh failed"));
     let auth: ReturnType<typeof useAuth> | undefined;
     function Probe() {
       auth = useAuth();
@@ -263,7 +318,81 @@ describe("AuthProvider and guards", () => {
     await act(async () => { expect(await auth!.reload()).toBeNull(); });
     expect(auth!.error).toBeInstanceOf(Error);
     view.unmount();
-    expect(() => render(<button onClick={() => useAuth()}>bad</button>)).not.toThrow();
+    function BareProbe() {
+      useAuth();
+      return null;
+    }
+    expect(() => render(<BareProbe />)).toThrow("useAuth must be used inside AuthProvider");
+  });
+
+  it("dedupes concurrent bootstrap calls behind a single in-flight promise", async () => {
+    let authA: ReturnType<typeof useAuth> | undefined;
+    let authB: ReturnType<typeof useAuth> | undefined;
+    function ProbeA() {
+      authA = useAuth();
+      return null;
+    }
+    function ProbeB() {
+      authB = useAuth();
+      return null;
+    }
+    const view = render(
+      <>
+        <AuthProvider><ProbeA /></AuthProvider>
+        <AuthProvider><ProbeB /></AuthProvider>
+      </>
+    );
+    await waitFor(() => {
+      expect(authA!.loading).toBe(false);
+      expect(authB!.loading).toBe(false);
+    });
+    expect(authApi.refreshToken).toHaveBeenCalledTimes(1);
+    expect(authA!.user?.email).toBe("ada@example.com");
+    expect(authB!.user?.email).toBe("ada@example.com");
+    view.unmount();
+  });
+
+  it("skips state updates for a bootstrap outcome that lands after unmount", async () => {
+    let rejectRefresh: (err: unknown) => void = () => {};
+    authApi.refreshToken.mockImplementationOnce(() => new Promise((_, reject) => { rejectRefresh = reject; }));
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    view.unmount();
+    await act(async () => {
+      rejectRefresh(new Error("late bootstrap failure"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const cleanup = render(<AuthProvider bootstrap={false}><Probe /></AuthProvider>);
+    await act(async () => { await auth!.login("ada@example.com", "password"); });
+    cleanup.unmount();
+  });
+
+  it("enters a failure cooldown after a failed bootstrap, then skips retry until it lapses", async () => {
+    authApi.refreshToken.mockRejectedValueOnce(new Error("bootstrap failed"));
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <span>{auth.loading ? "loading" : (auth.error ? "errored" : "ready")}</span>;
+    }
+    const first = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(auth!.error).toBeInstanceOf(Error);
+    expect(auth!.user).toBeNull();
+    first.unmount();
+
+    authApi.refreshToken.mockClear();
+    const second = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(authApi.refreshToken).not.toHaveBeenCalled();
+    expect(auth!.user).toBeNull();
+    await act(async () => { await auth!.login("ada@example.com", "password"); });
+    second.unmount();
   });
 });
 
@@ -330,9 +459,10 @@ describe("hooks", () => {
     expect(usersHook!.reload).toBe(firstUsersReload);
     expect(sessionsHook!.reload).toBe(firstSessionsReload);
     expect(sessionsHook!.reloadCurrent).toBe(firstCurrentSessionReload);
+    await act(async () => { await usersHook!.get(user.id); });
+    expect(userApi.getUser).toHaveBeenCalledWith(user.id);
     await act(async () => { await usersHook!.create({ provider: "password", email: "ada@example.com", password: "password1" }); });
     await act(async () => { await usersHook!.signup({ email: "ada@example.com", password: "password1" }); });
-    await act(async () => { await usersHook!.get(user.id); });
     await act(async () => { await usersHook!.update(user.id, { full_name: "Ada Lovelace" }); });
     await act(async () => { await usersHook!.remove(user.id); });
     await act(async () => { await sessionsHook!.revoke("session-id"); });
@@ -345,6 +475,83 @@ describe("hooks", () => {
     await act(async () => { await expect(dash!.reload()).rejects.toThrow("dash failed"); });
     await act(async () => { await expect(usersHook!.reload()).rejects.toThrow("users failed"); });
     await act(async () => { await expect(sessionsHook!.reload()).rejects.toThrow("sessions failed"); });
+    view.unmount();
+  });
+
+  it("drops the authorization caches and notifies the provider on a revoking update", async () => {
+    let usersHook: ReturnType<typeof useUsers>;
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const revocations: string[] = [];
+    const onRevocation = (event: Event) => {
+      revocations.push((event as CustomEvent<{ userId: string }>).detail.userId);
+    };
+    window.addEventListener(AUTH_REVOCATION_EVENT, onRevocation);
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useUsers(false)} expose={(v) => { usersHook = v; }} /></HookHarnessWithClient>);
+
+    userApi.updateUser.mockResolvedValueOnce({ ...user, role: "user", is_superuser: false, auth_generation: 4, revocation_enqueued: true });
+    await act(async () => { await usersHook!.update(user.id, { role: "user" }); });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.profile() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.sessions() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.apiKeys() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.adminApiKeys(user.id) });
+    expect(revocations).toEqual([user.id]);
+
+    // An update the backend did not revoke anything for leaves the
+    // session-scoped caches (and the provider) alone.
+    invalidateSpy.mockClear();
+    userApi.updateUser.mockResolvedValueOnce({ ...user, auth_generation: 4, revocation_enqueued: false });
+    await act(async () => { await usersHook!.update(user.id, { full_name: "Ada Lovelace" }); });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.users() });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: authKeys.profile() });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: authKeys.sessions() });
+    expect(revocations).toEqual([user.id]);
+
+    window.removeEventListener(AUTH_REVOCATION_EVENT, onRevocation);
+    view.unmount();
+  });
+
+  it("covers the admin API-key hook success and error paths", async () => {
+    let hook: ReturnType<typeof useAdminApiKeys>;
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useAdminApiKeys(user.id, false)} expose={(v) => { hook = v; }} /></HookHarnessWithClient>);
+    await act(async () => { await hook!.reload(); });
+    await waitFor(() => expect(hook!.apiKeys).toHaveLength(1));
+    expect(hook!.count).toBe(1);
+    await act(async () => { await hook!.revoke("11111111-1111-4111-8111-111111111115"); });
+    expect(apiKeyApi.adminRevokeApiKey.mock.calls[0][0]).toBe("11111111-1111-4111-8111-111111111115");
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.adminApiKeys(user.id) });
+    apiKeyApi.adminListUserApiKeys.mockRejectedValueOnce(new Error("admin keys failed"));
+    await act(async () => { await expect(hook!.reload()).rejects.toThrow("admin keys failed"); });
+    view.unmount();
+  });
+
+  it("disables the admin API-key query when no userId is given", async () => {
+    let hook: ReturnType<typeof useAdminApiKeys>;
+    const view = render(<HookHarnessWithClient client={createTestQueryClient()}><HookProbe hook={() => useAdminApiKeys("")} expose={(v) => { hook = v; }} /></HookHarnessWithClient>);
+    expect(hook!.apiKeys).toEqual([]);
+    expect(apiKeyApi.adminListUserApiKeys).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("covers the audit-log read hook and both purge mutations", async () => {
+    let auditHook: ReturnType<typeof useAuditLog>;
+    let purgeHook: ReturnType<typeof useSecurityPurges>;
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useAuditLog({}, false)} expose={(v) => { auditHook = v; }} /><HookProbe hook={() => useSecurityPurges()} expose={(v) => { purgeHook = v; }} /></HookHarnessWithClient>);
+    await act(async () => { await auditHook!.reload(); });
+    await waitFor(() => expect(auditHook!.rows).toHaveLength(1));
+    expect(auditHook!.count).toBe(1);
+    await act(async () => { await purgeHook!.purgeAudit("1m"); });
+    expect(securityApi.purgeAuditLog).toHaveBeenCalledWith({ window: "1m" });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.auditLog() });
+    await act(async () => { await purgeHook!.purgeKeys("1y"); });
+    expect(securityApi.purgeApiKeys).toHaveBeenCalledWith({ window: "1y" });
+    securityApi.getAuditLog.mockRejectedValueOnce(new Error("audit log failed"));
+    await act(async () => { await expect(auditHook!.reload()).rejects.toThrow("audit log failed"); });
     view.unmount();
   });
 
@@ -379,7 +586,108 @@ describe("default UI", () => {
     view.unmount();
   });
 
-  it("renders account states and logout", async () => {
+  it("rejects invalid form input, surfaces field errors, and never calls login", async () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginForm /></AuthProvider>);
+    await act(async () => {
+      view.container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(authApi.login).not.toHaveBeenCalled();
+    expect(view.container.querySelectorAll("p.text-sm.text-destructive").length).toBeGreaterThan(0);
+    view.unmount();
+  });
+
+  it("treats a strict-schema violation with no field target as blocking submission", async () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginForm /></AuthProvider>);
+    const form = view.container.querySelector("form")!;
+    const [email, password] = Array.from(view.container.querySelectorAll("input"));
+    act(() => {
+      email.value = "ada@example.com";
+      email.dispatchEvent(new Event("input", { bubbles: true }));
+      password.value = "password";
+      password.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const extra = document.createElement("input");
+    extra.name = "unexpected";
+    extra.value = "x";
+    form.appendChild(extra);
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(authApi.login).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("normalizes non-Error and empty-message submit failures to the default error message", async () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginForm /></AuthProvider>);
+    const fillAndSubmit = async () => {
+      const [email, password] = Array.from(view.container.querySelectorAll("input"));
+      act(() => {
+        email.value = "ada@example.com";
+        email.dispatchEvent(new Event("input", { bubbles: true }));
+        password.value = "password";
+        password.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => {
+        view.container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+    };
+    authApi.login.mockRejectedValueOnce("boom");
+    await fillAndSubmit();
+    expect(view.container.textContent).toContain("Invalid credentials. Please try again.");
+    authApi.login.mockRejectedValueOnce(new Error(""));
+    await fillAndSubmit();
+    expect(view.container.textContent).toContain("Invalid credentials. Please try again.");
+    view.unmount();
+  });
+
+  it("renders a provided Google icon and normalizes a non-Error Google login failure", async () => {
+    const onGoogleFailure = vi.fn().mockRejectedValueOnce("google boom");
+    const view = render(
+      <AuthProvider bootstrap={false}>
+        <LoginForm googleEnabled googleIcon={<svg data-testid="icon" />} onGoogleLogin={onGoogleFailure} />
+      </AuthProvider>
+    );
+    expect(view.container.querySelector("svg")).not.toBeNull();
+    await act(async () => {
+      view.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(view.container.textContent).toContain("Google sign-in is not available.");
+    view.unmount();
+  });
+
+  it("covers Google login unavailability, success, and failure branches", async () => {
+    const unavailable = render(<AuthProvider bootstrap={false}><LoginView googleEnabled /></AuthProvider>);
+    await act(async () => {
+      unavailable.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(unavailable.container.textContent).toContain("Google sign-in is not available.");
+    unavailable.unmount();
+
+    const onGoogleSuccess = vi.fn().mockResolvedValueOnce(undefined);
+    const success = render(<AuthProvider bootstrap={false}><LoginView googleEnabled onGoogle={onGoogleSuccess} /></AuthProvider>);
+    await act(async () => {
+      success.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onGoogleSuccess).toHaveBeenCalled();
+    expect(success.container.textContent).not.toContain("Google sign-in is not available.");
+    success.unmount();
+
+    const onGoogleFailure = vi.fn().mockRejectedValueOnce(new Error("google failed"));
+    const failure = render(<AuthProvider bootstrap={false}><LoginView googleEnabled onGoogle={onGoogleFailure} /></AuthProvider>);
+    await act(async () => {
+      failure.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(failure.container.textContent).toContain("google failed");
+    failure.unmount();
+  });
+
+  it("omits the signup link when LoginView has no signupHref", () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginView /></AuthProvider>);
+    expect(view.container.querySelector("a")).toBeNull();
+    view.unmount();
+  });
+
+  it("renders account states, logout, and the signed-out placeholder", async () => {
     let view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
     await waitFor(() => expect(view.container.textContent).toContain("ada@example.com"));
     expect(view.container.querySelector(".fa-auth-panel dl")).not.toBeNull();
@@ -390,6 +698,24 @@ describe("default UI", () => {
     await waitFor(() => expect(view.container.textContent).toContain("Unable to load account"));
     expect(view.container.querySelector(".fa-auth-panel [role='alert']")).not.toBeNull();
     view.unmount();
+    profileApi.getProfile.mockResolvedValueOnce(null as never);
+    view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
+    await waitFor(() => expect(view.container.textContent).toContain("Please sign in to view your account."));
+    view.unmount();
+    profileApi.getProfile.mockResolvedValueOnce({ ...user, full_name: null });
+    view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
+    await waitFor(() => expect(view.container.textContent).toContain("Not set"));
+    view.unmount();
+  });
+
+  it("renders the starter account and login pages", async () => {
+    const accountPage = render(<StarterAccountPage />);
+    await waitFor(() => expect(accountPage.container.textContent).toContain("ada@example.com"));
+    accountPage.unmount();
+
+    const loginPage = render(<StarterLoginPage />);
+    expect(loginPage.container.textContent).toContain("Sign in");
+    loginPage.unmount();
   });
 
   it("renders callback success, missing state, and failure states", async () => {

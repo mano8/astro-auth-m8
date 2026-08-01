@@ -152,6 +152,28 @@
           "target": "components/fa-auth/admin-users-panel.tsx"
         }
       ]
+    },
+    {
+      "name": "security-panel",
+      "type": "registry:component",
+      "title": "Account Security Panel",
+      "description": "fa-auth admin-tier privileged-action audit log on the canonical data-table plus the two superuser-only retention purges, each behind a confirmation naming the retention floor. Gated by the package's RequireRole (role hierarchy for the log, dual evidence for the purges) and driven by useAuditLog + useSecurityPurges. Requires @mano8/astro-auth-m8 installed.",
+      "dependencies": ["lucide-react", "@tanstack/react-table"],
+      "registryDependencies": [
+        "card",
+        "button",
+        "label",
+        "badge",
+        "./node_modules/@mano8/astro-ui-m8/registry/r/data-table.json",
+        "./account-crud.json"
+      ],
+      "files": [
+        {
+          "path": "registry/blocks/account/security-panel.tsx",
+          "type": "registry:component",
+          "target": "components/fa-auth/security-panel.tsx"
+        }
+      ]
     }
   ]
 }

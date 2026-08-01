@@ -17,6 +17,7 @@ import * as dashboard from "../src/runtime/api/dashboard.js";
 import * as oauth from "../src/runtime/api/oauth.js";
 import * as ops from "../src/runtime/api/ops.js";
 import * as profile from "../src/runtime/api/profile.js";
+import * as security from "../src/runtime/api/security.js";
 import * as sessions from "../src/runtime/api/sessions.js";
 import * as users from "../src/runtime/api/users.js";
 import { clearToken, setToken } from "../src/runtime/tokenStore.js";
@@ -78,6 +79,26 @@ describe("feature API wrappers", () => {
     await apiKeys.verifyApiKey("secret");
     expect(requestMock.mock.calls.map(([arg]) => arg.path)).toEqual(["/profile/api-keys/", "/profile/api-keys/", "/profile/api-keys/key%20id", "/profile/api-keys/key%20id", "/profile/api-keys/verify"]);
     expect(requestMock).toHaveBeenLastCalledWith(expect.objectContaining({ headers: { "X-API-Key": "secret" }, skipRefresh: true }));
+  });
+
+  it("covers the admin API-key surface", async () => {
+    await apiKeys.adminListUserApiKeys("user id");
+    await apiKeys.adminRevokeApiKey("key id");
+    expect(requestMock.mock.calls.map(([arg]) => arg.path)).toEqual(["/api-keys/by-user/user%20id/", "/api-keys/revoke/key%20id/"]);
+    expect(requestMock.mock.calls.map(([arg]) => arg.method)).toEqual(["GET", "POST"]);
+    expect(requestMock.mock.calls.every(([arg]) => arg.auth === true)).toBe(true);
+  });
+
+  it("covers the security audit-log and purge surface", async () => {
+    await security.getAuditLog();
+    await security.getAuditLog({ skip: 5, limit: 10 });
+    await security.purgeAuditLog({ window: "1m" });
+    await security.purgeApiKeys({ window: "1y" });
+    expect(requestMock.mock.calls.map(([arg]) => arg.path)).toEqual(["/security/audit-log", "/security/audit-log", "/security/audit-log/purge", "/security/api-keys/purge"]);
+    expect(requestMock.mock.calls[0][0].query).toEqual({ skip: 0, limit: 100 });
+    expect(requestMock.mock.calls[1][0].query).toEqual({ skip: 5, limit: 10 });
+    expect(requestMock.mock.calls[2][0].body).toEqual({ window: "1m" });
+    expect(requestMock.mock.calls[3][0].body).toEqual({ window: "1y" });
   });
 
   it("covers user endpoints", async () => {

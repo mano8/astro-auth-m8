@@ -11,6 +11,7 @@ import { KeyRound, Trash2 } from "lucide-react";
 import { useApiKeys } from "@mano8/astro-auth-m8/hooks";
 import {
   ApiKeyCreateSchema,
+  type ApiKeyAccessMode,
   type ApiKeyPublic,
 } from "@mano8/astro-auth-m8/schemas";
 
@@ -60,6 +61,12 @@ export interface ApiKeysPanelLabels {
   unitDays: string;
   unitWeeks: string;
   defaultName: string;
+  accessMode: string;
+  accessModeReadOnly: string;
+  accessModeReadWrite: string;
+  audiences: string;
+  audiencesPlaceholder: string;
+  audiencesHelp: string;
   generating: string;
   mint: string;
   cancel: string;
@@ -76,6 +83,7 @@ export interface ApiKeysPanelLabels {
   status: string;
   expires: string;
   lastUsed: string;
+  audiencesNone: string;
   notUsed: string;
   notAvailable: string;
   revoke: string;
@@ -104,6 +112,13 @@ const DEFAULT_LABELS: ApiKeysPanelLabels = {
   unitDays: "Days",
   unitWeeks: "Weeks",
   defaultName: "Default key",
+  accessMode: "Access mode",
+  accessModeReadOnly: "Read-only",
+  accessModeReadWrite: "Read-write",
+  audiences: "Audiences",
+  audiencesPlaceholder: "e.g. media-service-m8, prompt-engine-m8",
+  audiencesHelp:
+    "Comma-separated consumer ids permitted to introspect this key remotely. Leave empty for issuer-local use only. Immutable after issuance.",
   generating: "Generating...",
   mint: "Mint new key",
   cancel: "Cancel",
@@ -121,6 +136,7 @@ const DEFAULT_LABELS: ApiKeysPanelLabels = {
   status: "Status",
   expires: "Expires",
   lastUsed: "Last used",
+  audiencesNone: "Issuer-local only",
   notUsed: "Never used",
   notAvailable: "n/a",
   revoke: "Revoke",
@@ -160,6 +176,8 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
   const [name, setName] = React.useState("");
   const [ttlAmount, setTtlAmount] = React.useState("30");
   const [ttlUnit, setTtlUnit] = React.useState<TtlUnit>("days");
+  const [accessMode, setAccessMode] = React.useState<ApiKeyAccessMode>("read_only");
+  const [audiences, setAudiences] = React.useState("");
 
   const [revealOpen, setRevealOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -177,6 +195,8 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
     setName("");
     setTtlAmount("30");
     setTtlUnit("days");
+    setAccessMode("read_only");
+    setAudiences("");
     setCreating(true);
   };
 
@@ -186,9 +206,15 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
       1,
       Math.round((Number(ttlAmount) || 1) * TTL_UNIT_HOURS[ttlUnit]),
     );
+    const parsedAudiences = audiences
+      .split(",")
+      .map((audience) => audience.trim())
+      .filter((audience) => audience.length > 0);
     const parsed = ApiKeyCreateSchema.safeParse({
       name: name.trim() || t.defaultName,
       ttl_hours: ttlHours,
+      access_mode: accessMode,
+      audiences: parsedAudiences.length > 0 ? parsedAudiences : undefined,
     });
     if (!parsed.success) {
       accountToast.error({
@@ -207,7 +233,7 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
       setRevealOpen(true);
       accountToast.success({ title: t.created });
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.createFailed) });
+      accountToast.error(errorMessage(error, t.createFailed));
     } finally {
       setIsSubmitting(false);
     }
@@ -231,7 +257,7 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
       setBulkRevoke(false);
       setRowSelection({});
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.revokeFailed) });
+      accountToast.error(errorMessage(error, t.revokeFailed));
     } finally {
       setIsRevoking(false);
     }
@@ -292,6 +318,29 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
           ) : (
             <Badge>{t.active}</Badge>
           ),
+      },
+      {
+        accessorKey: "accessMode",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.accessMode} />
+        ),
+        cell: ({ row }) => (
+          <Badge variant="outline">
+            {row.original.access_mode === "read_write"
+              ? t.accessModeReadWrite
+              : t.accessModeReadOnly}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: "audiences",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t.audiences} />
+        ),
+        cell: ({ row }) =>
+          row.original.audiences.length > 0
+            ? row.original.audiences.join(", ")
+            : t.audiencesNone,
       },
       {
         accessorKey: "expires",
@@ -411,6 +460,32 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
                 <option value="weeks">{t.unitWeeks}</option>
               </select>
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="api-key-access-mode">{t.accessMode}</Label>
+            <select
+              id="api-key-access-mode"
+              aria-label={t.accessMode}
+              value={accessMode}
+              onChange={(event) =>
+                setAccessMode(event.target.value as ApiKeyAccessMode)
+              }
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="read_only">{t.accessModeReadOnly}</option>
+              <option value="read_write">{t.accessModeReadWrite}</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="api-key-audiences">{t.audiences}</Label>
+            <Input
+              id="api-key-audiences"
+              aria-label={t.audiences}
+              value={audiences}
+              onChange={(event) => setAudiences(event.target.value)}
+              placeholder={t.audiencesPlaceholder}
+            />
+            <p className="text-xs text-muted-foreground">{t.audiencesHelp}</p>
           </div>
           <DialogFooter>
             <Button

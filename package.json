@@ -36,6 +36,7 @@
     "./client": "./dist/src/runtime/client.js",
     "./browser-adapter": "./dist/src/runtime/browserAdapter.js",
     "./schemas": "./dist/src/runtime/schemas.js",
+    "./errors": "./dist/src/runtime/errors.js",
     "./hooks": "./dist/src/runtime/hooks/index.js",
     "./list-params": "./dist/src/runtime/listParams.js",
     "./react": "./dist/src/runtime/react/index.js",

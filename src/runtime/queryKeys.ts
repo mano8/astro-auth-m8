@@ -7,5 +7,7 @@ export const authKeys = {
   users: (params?: Record<string, unknown>) => [...authKeyRoot, "users", params ?? {}] as const,
   user: (id: string) => [...authKeyRoot, "users", id] as const,
   sessions: () => [...authKeyRoot, "sessions"] as const,
-  apiKeys: () => [...authKeyRoot, "apiKeys"] as const
+  apiKeys: () => [...authKeyRoot, "apiKeys"] as const,
+  adminApiKeys: (userId: string) => [...authKeyRoot, "adminApiKeys", userId] as const,
+  auditLog: (params?: Record<string, unknown>) => [...authKeyRoot, "auditLog", params ?? {}] as const
 } as const;

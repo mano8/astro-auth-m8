@@ -22,4 +22,11 @@ describe("authKeys", () => {
     expect(authKeys.users({ ...params })).toEqual(["auth", "users", params]);
     expect(authKeys.user("user-1")).toEqual(["auth", "users", "user-1"]);
   });
+
+  it("builds admin API-key and audit-log keys", () => {
+    expect(authKeys.adminApiKeys("user-1")).toEqual(["auth", "adminApiKeys", "user-1"]);
+    const params = { skip: 0, limit: 100 };
+    expect(authKeys.auditLog()).toEqual(["auth", "auditLog", {}]);
+    expect(authKeys.auditLog(params)).toEqual(["auth", "auditLog", params]);
+  });
 });

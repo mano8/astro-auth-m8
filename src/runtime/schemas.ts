@@ -163,6 +163,69 @@ export const ApiKeyCreatedSchema = ApiKeyPublicSchema.extend({
 }).strict();
 export type ApiKeyCreated = z.infer<typeof ApiKeyCreatedSchema>;
 
+// Superadmin-only metadata view of another user's key (AA-17). Deliberately a
+// distinct shape from ApiKeyPublicSchema — adds `user_id` + a server-derived
+// `status`, omits `updated_at` — never reuse the owner schema here.
+export const ApiKeyAdminStatusSchema = z.enum(["active", "revoked", "expired"]);
+export type ApiKeyAdminStatus = z.infer<typeof ApiKeyAdminStatusSchema>;
+
+export const ApiKeyAdminPublicSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().nullable(),
+  user_id: z.string().uuid(),
+  revoked: z.boolean(),
+  expires_at: nullableIsoDate,
+  last_used_at: nullableIsoDate,
+  created_at: isoDate,
+  access_mode: ApiKeyAccessModeSchema,
+  status: ApiKeyAdminStatusSchema,
+  audiences: z.array(z.string()).default([])
+}).strict();
+export type ApiKeyAdminPublic = z.infer<typeof ApiKeyAdminPublicSchema>;
+
+export const ApiKeysAdminPublicSchema = z.object({
+  data: z.array(ApiKeyAdminPublicSchema),
+  count: z.number().int().nonnegative()
+}).strict();
+export type ApiKeysAdminPublic = z.infer<typeof ApiKeysAdminPublicSchema>;
+
+// Closed retention-window enum shared by both purge maintenance actions
+// (AA-19) — never free text or a date.
+export const RetentionWindowSchema = z.enum(["1w", "1m", "3m", "6m", "1y"]);
+export type RetentionWindow = z.infer<typeof RetentionWindowSchema>;
+
+export const PurgeRequestSchema = z.object({
+  window: RetentionWindowSchema
+}).strict();
+export type PurgeRequest = z.infer<typeof PurgeRequestSchema>;
+
+export const PurgeResponseSchema = z.object({
+  window: RetentionWindowSchema,
+  removed: z.number().int().nonnegative()
+}).strict();
+export type PurgeResponse = z.infer<typeof PurgeResponseSchema>;
+
+export const AuditActionSchema = z.enum(["add", "edit", "delete"]);
+export type AuditAction = z.infer<typeof AuditActionSchema>;
+
+export const PrivilegedActionAuditPublicSchema = z.object({
+  id: z.string().uuid(),
+  created_at: isoDate,
+  actor_user_id: z.string().uuid(),
+  actor_role: RoleTypeSchema,
+  action: AuditActionSchema,
+  table_name: z.string(),
+  row_pk: z.string(),
+  target_owner_id: z.string().nullable().optional()
+}).strict();
+export type PrivilegedActionAuditPublic = z.infer<typeof PrivilegedActionAuditPublicSchema>;
+
+export const PrivilegedActionAuditsPublicSchema = z.object({
+  data: z.array(PrivilegedActionAuditPublicSchema),
+  count: z.number().int().nonnegative()
+}).strict();
+export type PrivilegedActionAuditsPublic = z.infer<typeof PrivilegedActionAuditsPublicSchema>;
+
 export const ClientSessionPublicSchema = z.object({
   id: z.string(),
   provider: AuthProviderTypeSchema,
