@@ -8,7 +8,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "lcov"],
       include: ["src/**/*.ts"],
-      exclude: ["src/**/*.astro", "src/runtime/hooks/**", "src/runtime/react/**"],
+      exclude: ["src/**/*.astro"],
       thresholds: {
         statements: 100,
         branches: 100,

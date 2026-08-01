@@ -22,7 +22,7 @@ vi.mock("../src/runtime/api/users.js", () => userApi);
 vi.mock("../src/runtime/api/oauth.js", () => oauthApi);
 
 import { AuthProvider, AuthQueryProvider, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
-import { AccountView, CallbackView, LoginView, SignupView } from "../src/runtime/react/default-ui/index.js";
+import { AccountView, CallbackView, LoginForm, LoginView, SignupView, StarterAccountPage, StarterLoginPage } from "../src/runtime/react/default-ui/index.js";
 import { useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
 import { useDashboard } from "../src/runtime/hooks/useDashboard.js";
 import { useGoogleLogin } from "../src/runtime/hooks/useGoogleLogin.js";
@@ -252,7 +252,6 @@ describe("AuthProvider and guards", () => {
 
   it("handles bootstrap and reload errors, disabled bootstrap, fallback branches, and missing provider", async () => {
     profileApi.getProfile.mockRejectedValueOnce(new Error("profile failed"));
-    authApi.refreshToken.mockRejectedValueOnce(new Error("refresh failed"));
     let auth: ReturnType<typeof useAuth> | undefined;
     function Probe() {
       auth = useAuth();
@@ -263,7 +262,81 @@ describe("AuthProvider and guards", () => {
     await act(async () => { expect(await auth!.reload()).toBeNull(); });
     expect(auth!.error).toBeInstanceOf(Error);
     view.unmount();
-    expect(() => render(<button onClick={() => useAuth()}>bad</button>)).not.toThrow();
+    function BareProbe() {
+      useAuth();
+      return null;
+    }
+    expect(() => render(<BareProbe />)).toThrow("useAuth must be used inside AuthProvider");
+  });
+
+  it("dedupes concurrent bootstrap calls behind a single in-flight promise", async () => {
+    let authA: ReturnType<typeof useAuth> | undefined;
+    let authB: ReturnType<typeof useAuth> | undefined;
+    function ProbeA() {
+      authA = useAuth();
+      return null;
+    }
+    function ProbeB() {
+      authB = useAuth();
+      return null;
+    }
+    const view = render(
+      <>
+        <AuthProvider><ProbeA /></AuthProvider>
+        <AuthProvider><ProbeB /></AuthProvider>
+      </>
+    );
+    await waitFor(() => {
+      expect(authA!.loading).toBe(false);
+      expect(authB!.loading).toBe(false);
+    });
+    expect(authApi.refreshToken).toHaveBeenCalledTimes(1);
+    expect(authA!.user?.email).toBe("ada@example.com");
+    expect(authB!.user?.email).toBe("ada@example.com");
+    view.unmount();
+  });
+
+  it("skips state updates for a bootstrap outcome that lands after unmount", async () => {
+    let rejectRefresh: (err: unknown) => void = () => {};
+    authApi.refreshToken.mockImplementationOnce(() => new Promise((_, reject) => { rejectRefresh = reject; }));
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    view.unmount();
+    await act(async () => {
+      rejectRefresh(new Error("late bootstrap failure"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const cleanup = render(<AuthProvider bootstrap={false}><Probe /></AuthProvider>);
+    await act(async () => { await auth!.login("ada@example.com", "password"); });
+    cleanup.unmount();
+  });
+
+  it("enters a failure cooldown after a failed bootstrap, then skips retry until it lapses", async () => {
+    authApi.refreshToken.mockRejectedValueOnce(new Error("bootstrap failed"));
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <span>{auth.loading ? "loading" : (auth.error ? "errored" : "ready")}</span>;
+    }
+    const first = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(auth!.error).toBeInstanceOf(Error);
+    expect(auth!.user).toBeNull();
+    first.unmount();
+
+    authApi.refreshToken.mockClear();
+    const second = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(authApi.refreshToken).not.toHaveBeenCalled();
+    expect(auth!.user).toBeNull();
+    await act(async () => { await auth!.login("ada@example.com", "password"); });
+    second.unmount();
   });
 });
 
@@ -330,9 +403,10 @@ describe("hooks", () => {
     expect(usersHook!.reload).toBe(firstUsersReload);
     expect(sessionsHook!.reload).toBe(firstSessionsReload);
     expect(sessionsHook!.reloadCurrent).toBe(firstCurrentSessionReload);
+    await act(async () => { await usersHook!.get(user.id); });
+    expect(userApi.getUser).toHaveBeenCalledWith(user.id);
     await act(async () => { await usersHook!.create({ provider: "password", email: "ada@example.com", password: "password1" }); });
     await act(async () => { await usersHook!.signup({ email: "ada@example.com", password: "password1" }); });
-    await act(async () => { await usersHook!.get(user.id); });
     await act(async () => { await usersHook!.update(user.id, { full_name: "Ada Lovelace" }); });
     await act(async () => { await usersHook!.remove(user.id); });
     await act(async () => { await sessionsHook!.revoke("session-id"); });
@@ -379,7 +453,108 @@ describe("default UI", () => {
     view.unmount();
   });
 
-  it("renders account states and logout", async () => {
+  it("rejects invalid form input, surfaces field errors, and never calls login", async () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginForm /></AuthProvider>);
+    await act(async () => {
+      view.container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(authApi.login).not.toHaveBeenCalled();
+    expect(view.container.querySelectorAll("p.text-sm.text-destructive").length).toBeGreaterThan(0);
+    view.unmount();
+  });
+
+  it("treats a strict-schema violation with no field target as blocking submission", async () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginForm /></AuthProvider>);
+    const form = view.container.querySelector("form")!;
+    const [email, password] = Array.from(view.container.querySelectorAll("input"));
+    act(() => {
+      email.value = "ada@example.com";
+      email.dispatchEvent(new Event("input", { bubbles: true }));
+      password.value = "password";
+      password.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const extra = document.createElement("input");
+    extra.name = "unexpected";
+    extra.value = "x";
+    form.appendChild(extra);
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(authApi.login).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("normalizes non-Error and empty-message submit failures to the default error message", async () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginForm /></AuthProvider>);
+    const fillAndSubmit = async () => {
+      const [email, password] = Array.from(view.container.querySelectorAll("input"));
+      act(() => {
+        email.value = "ada@example.com";
+        email.dispatchEvent(new Event("input", { bubbles: true }));
+        password.value = "password";
+        password.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => {
+        view.container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+    };
+    authApi.login.mockRejectedValueOnce("boom");
+    await fillAndSubmit();
+    expect(view.container.textContent).toContain("Invalid credentials. Please try again.");
+    authApi.login.mockRejectedValueOnce(new Error(""));
+    await fillAndSubmit();
+    expect(view.container.textContent).toContain("Invalid credentials. Please try again.");
+    view.unmount();
+  });
+
+  it("renders a provided Google icon and normalizes a non-Error Google login failure", async () => {
+    const onGoogleFailure = vi.fn().mockRejectedValueOnce("google boom");
+    const view = render(
+      <AuthProvider bootstrap={false}>
+        <LoginForm googleEnabled googleIcon={<svg data-testid="icon" />} onGoogleLogin={onGoogleFailure} />
+      </AuthProvider>
+    );
+    expect(view.container.querySelector("svg")).not.toBeNull();
+    await act(async () => {
+      view.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(view.container.textContent).toContain("Google sign-in is not available.");
+    view.unmount();
+  });
+
+  it("covers Google login unavailability, success, and failure branches", async () => {
+    const unavailable = render(<AuthProvider bootstrap={false}><LoginView googleEnabled /></AuthProvider>);
+    await act(async () => {
+      unavailable.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(unavailable.container.textContent).toContain("Google sign-in is not available.");
+    unavailable.unmount();
+
+    const onGoogleSuccess = vi.fn().mockResolvedValueOnce(undefined);
+    const success = render(<AuthProvider bootstrap={false}><LoginView googleEnabled onGoogle={onGoogleSuccess} /></AuthProvider>);
+    await act(async () => {
+      success.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onGoogleSuccess).toHaveBeenCalled();
+    expect(success.container.textContent).not.toContain("Google sign-in is not available.");
+    success.unmount();
+
+    const onGoogleFailure = vi.fn().mockRejectedValueOnce(new Error("google failed"));
+    const failure = render(<AuthProvider bootstrap={false}><LoginView googleEnabled onGoogle={onGoogleFailure} /></AuthProvider>);
+    await act(async () => {
+      failure.container.querySelector("button[type='button']")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(failure.container.textContent).toContain("google failed");
+    failure.unmount();
+  });
+
+  it("omits the signup link when LoginView has no signupHref", () => {
+    const view = render(<AuthProvider bootstrap={false}><LoginView /></AuthProvider>);
+    expect(view.container.querySelector("a")).toBeNull();
+    view.unmount();
+  });
+
+  it("renders account states, logout, and the signed-out placeholder", async () => {
     let view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
     await waitFor(() => expect(view.container.textContent).toContain("ada@example.com"));
     expect(view.container.querySelector(".fa-auth-panel dl")).not.toBeNull();
@@ -390,6 +565,24 @@ describe("default UI", () => {
     await waitFor(() => expect(view.container.textContent).toContain("Unable to load account"));
     expect(view.container.querySelector(".fa-auth-panel [role='alert']")).not.toBeNull();
     view.unmount();
+    profileApi.getProfile.mockResolvedValueOnce(null as never);
+    view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
+    await waitFor(() => expect(view.container.textContent).toContain("Please sign in to view your account."));
+    view.unmount();
+    profileApi.getProfile.mockResolvedValueOnce({ ...user, full_name: null });
+    view = render(<AuthProvider bootstrap={false}><AccountView /></AuthProvider>);
+    await waitFor(() => expect(view.container.textContent).toContain("Not set"));
+    view.unmount();
+  });
+
+  it("renders the starter account and login pages", async () => {
+    const accountPage = render(<StarterAccountPage />);
+    await waitFor(() => expect(accountPage.container.textContent).toContain("ada@example.com"));
+    accountPage.unmount();
+
+    const loginPage = render(<StarterLoginPage />);
+    expect(loginPage.container.textContent).toContain("Sign in");
+    loginPage.unmount();
   });
 
   it("renders callback success, missing state, and failure states", async () => {

@@ -24,6 +24,7 @@ let bootstrapSessionPromise: Promise<UserPublic | null> | null = null;
 let bootstrapFailureUntil = 0;
 
 function emitAuthSession(user: UserPublic | null) {
+  /* v8 ignore next -- SSR guard: only reachable if this module runs outside a browser, which the jsdom test environment cannot simulate without corrupting the DOM globals it also depends on (see client.ts's analogous guard, tested via a separate non-jsdom file instead) */
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT, { detail: { user } }));
 }
