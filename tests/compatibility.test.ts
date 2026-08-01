@@ -53,6 +53,30 @@ describe("fa-auth-m8 compatibility contract", () => {
     ).toMatchObject({ status: "incompatible", contractVersion: "2.1" });
   });
 
+  it("rejects another service's /meta even when its contract version matches", () => {
+    // Every M8 service serves this payload shape from the shared
+    // auth-sdk-m8 `mount_service_meta` helper, so a host pointed at the wrong
+    // sibling must be named as a wrong contract, not blessed because the
+    // version digits happen to line up.
+    const wrongService = {
+      service: "fa-media-m8",
+      version: "2.0.0",
+      api_version: "v1",
+      contract: { name: "fa-media-m8", version: "2.0", range: ">=2.0.0 <3.0.0" }
+    };
+    const result = getFaAuthM8Compatibility(wrongService);
+
+    expect(result.status).toBe("incompatible");
+    expect(result.reason).toContain("fa-media-m8");
+    expect(result.reason).toContain(FA_AUTH_M8_CONTRACT);
+  });
+
+  it("accepts a nested contract that names the expected issuer", () => {
+    expect(
+      getFaAuthM8Compatibility({ contract: { name: "fa-auth-m8", version: "2.0" } })
+    ).toMatchObject({ status: "compatible", contractVersion: "2.0" });
+  });
+
   it("rejects mismatched contract and service metadata", () => {
     expect(getFaAuthM8Compatibility({ auth_contract: "0.8" })).toMatchObject({ status: "incompatible", contractVersion: "0.8" });
     expect(getFaAuthM8Compatibility({ contract: "fa-auth-m8@2.1" })).toMatchObject({ status: "incompatible", contractVersion: "fa-auth-m8@2.1" });

@@ -24,6 +24,7 @@
     "registry.json",
     "registry/r",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "bin": {

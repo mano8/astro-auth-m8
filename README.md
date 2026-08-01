@@ -62,7 +62,7 @@ import { describeApiError } from "@mano8/astro-auth-m8/errors";
 const { title, description } = describeApiError(error, "Update failed");
 ```
 
-`403` self-promotion and `409` `last_superuser_required` are labelled (the raw `last_superuser_required` token is never surfaced); `429` and `503` are distinguished (rate limited vs. an unknown outcome that must not be retried); `400` free-text detail (e.g. a purge's retention-floor rejection) is surfaced verbatim under a labelled heading rather than pattern-matched.
+`409` `last_superuser_required` is labelled (the raw token is never surfaced); `403` is titled by status (`Not permitted`) with the backend's own readable detail as the description, since several surfaces produce a `403` and the detail that distinguishes them is not a stable contract; `429` and `503` are distinguished (rate limited vs. an unknown outcome that must not be retried); `400` free-text detail (e.g. a purge's retention-floor rejection) is surfaced verbatim under a labelled heading rather than pattern-matched.
 
 ## Admin API-key and security surfaces (fa-auth-m8 2.0.0)
 
