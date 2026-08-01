@@ -48,6 +48,18 @@ hasSuperuserPrivileges(user.role, user.is_superuser);
 
 The valid role/flag pairs are `superadmin` with `is_superuser: true`, and every other role with `is_superuser: false`. `privilegeClaimsAreConsistent` exposes that invariant on its own, and `ORDERED_ROLES` exposes the hierarchy, highest privilege first. Any other pair - including an unrecognised role - grants nothing. These are display predicates; the backend stays the authority.
 
+## Error presentation
+
+`@mano8/astro-auth-m8/errors` exports `ApiError` plus `describeApiError(error, fallback)`, which maps the `fa-auth-m8` 2.0.0 authorization/rate-limit/retention error contracts to an operator-readable `{ title, description? }` (used by the `errorMessage` helper in the account registry blocks):
+
+```ts
+import { describeApiError } from "@mano8/astro-auth-m8/errors";
+
+const { title, description } = describeApiError(error, "Update failed");
+```
+
+`403` self-promotion and `409` `last_superuser_required` are labelled (the raw `last_superuser_required` token is never surfaced); `429` and `503` are distinguished (rate limited vs. an unknown outcome that must not be retried); `400` free-text detail (e.g. a purge's retention-floor rejection) is surfaced verbatim under a labelled heading rather than pattern-matched.
+
 ## Modes
 
 - `headless`: exports typed schemas, API wrappers, token handling, React provider/hooks, and route helpers without injecting pages.

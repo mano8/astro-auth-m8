@@ -207,7 +207,7 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
       setRevealOpen(true);
       accountToast.success({ title: t.created });
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.createFailed) });
+      accountToast.error(errorMessage(error, t.createFailed));
     } finally {
       setIsSubmitting(false);
     }
@@ -231,7 +231,7 @@ export function ApiKeysPanel({ labels }: { labels?: Partial<ApiKeysPanelLabels> 
       setBulkRevoke(false);
       setRowSelection({});
     } catch (error) {
-      accountToast.error({ title: errorMessage(error, t.revokeFailed) });
+      accountToast.error(errorMessage(error, t.revokeFailed));
     } finally {
       setIsRevoking(false);
     }
