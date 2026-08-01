@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+// Declared from highest to lowest privilege: `runtime/authorization.ts` reads
+// this order as the canonical role hierarchy. Do not reorder.
 export const RoleTypeSchema = z.enum(["superadmin", "admin", "writer", "reader", "user"]);
 export type RoleType = z.infer<typeof RoleTypeSchema>;
 
@@ -41,6 +43,12 @@ export const UserPublicSchema = z.object({
 }).strict();
 export type UserPublic = z.infer<typeof UserPublicSchema>;
 
+export const UserAuthorizationUpdateSchema = UserPublicSchema.extend({
+  auth_generation: z.number().int(),
+  revocation_enqueued: z.boolean()
+}).strict();
+export type UserAuthorizationUpdate = z.infer<typeof UserAuthorizationUpdateSchema>;
+
 export const ResponseUserSchema = z.object({
   success: z.boolean(),
   user: UserPublicSchema
@@ -67,7 +75,6 @@ const userCreateBase = z.object({
   avatar: z.string().max(255).url().nullable().optional(),
   is_active: z.boolean().optional(),
   email_verified: z.boolean().optional(),
-  is_superuser: z.boolean().optional(),
   role: RoleTypeSchema.optional(),
   password: z.string().min(8).max(128).nullable().optional(),
   oauth_user_id: z.string().max(256).nullable().optional()
@@ -100,6 +107,7 @@ export const UserUpdateSchema = z.object({
   password: z.string().min(8).max(128).nullable().optional(),
   oauth_user_id: z.string().max(256).nullable().optional(),
   role: RoleTypeSchema.nullable().optional(),
+  is_active: z.boolean().nullable().optional(),
   provider: AuthProviderTypeSchema.nullable().optional()
 }).strict().superRefine((value, ctx) => {
   if (value.provider === "password" && value.oauth_user_id != null) {
@@ -124,6 +132,11 @@ export const UpdatePasswordSchema = z.object({
 }).strict();
 export type UpdatePassword = z.infer<typeof UpdatePasswordSchema>;
 
+// Immutable operation-category cap chosen at issuance (APIKEY-MODE-01); never
+// changed afterward - issuing a replacement key is the only way to widen it.
+export const ApiKeyAccessModeSchema = z.enum(["read_only", "read_write"]);
+export type ApiKeyAccessMode = z.infer<typeof ApiKeyAccessModeSchema>;
+
 export const ApiKeyPublicSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(3).max(100),
@@ -131,13 +144,17 @@ export const ApiKeyPublicSchema = z.object({
   revoked: z.boolean().default(false),
   last_used_at: nullableIsoDate.default(null),
   created_at: isoDate.optional(),
-  updated_at: isoDate.optional()
+  updated_at: isoDate.optional(),
+  access_mode: ApiKeyAccessModeSchema.default("read_only"),
+  audiences: z.array(z.string()).default([])
 }).strict();
 export type ApiKeyPublic = z.infer<typeof ApiKeyPublicSchema>;
 
 export const ApiKeyCreateSchema = z.object({
   name: z.string().min(3).max(100).nullable().optional(),
-  ttl_hours: z.number().int().positive().default(24)
+  ttl_hours: z.number().int().positive().default(24),
+  access_mode: ApiKeyAccessModeSchema.default("read_only"),
+  audiences: z.array(z.string()).nullable().optional()
 }).strict();
 export type ApiKeyCreate = z.infer<typeof ApiKeyCreateSchema>;
 

@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { createUser, deleteUser, getUser, listUsers, signupUser, updateUser } from "../api/users.js";
 import { refetchOrThrow } from "./queryHelpers.js";
 import { authKeys } from "../queryKeys.js";
-import type { UserCreate, UserRegister, UserUpdate, UsersPublic } from "../schemas.js";
+import type { UserAuthorizationUpdate, UserCreate, UserRegister, UserUpdate, UsersPublic } from "../schemas.js";
 
 export function useUsers(load = true) {
   const queryClient = useQueryClient();
@@ -64,7 +64,7 @@ export function useUsers(load = true) {
     queryFn: () => getUser(id),
     staleTime: 30_000
   }), [queryClient]);
-  const update = useCallback((id: string, body: UserUpdate) => updateUserAsync({ id, body }), [updateUserAsync]);
+  const update = useCallback((id: string, body: UserUpdate): Promise<UserAuthorizationUpdate> => updateUserAsync({ id, body }), [updateUserAsync]);
   const remove = useCallback((id: string) => removeUserAsync(id), [removeUserAsync]);
 
   const users: UsersPublic | null = usersQuery.data ?? null;

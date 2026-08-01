@@ -1,9 +1,11 @@
 import { request } from "../client.js";
 import {
   MessageSchema,
+  UserAuthorizationUpdateSchema,
   UserPublicSchema,
   UsersPublicSchema,
   type Message,
+  type UserAuthorizationUpdate,
   type UserCreate,
   type UserPublic,
   type UserRegister,
@@ -27,8 +29,8 @@ export function getUser(id: string): Promise<UserPublic> {
   return request({ method: "GET", path: `/users/get/${encodeURIComponent(id)}/`, schema: UserPublicSchema, auth: true });
 }
 
-export function updateUser(id: string, body: UserUpdate): Promise<UserPublic> {
-  return request({ method: "PATCH", path: `/users/update/${encodeURIComponent(id)}/`, body, schema: UserPublicSchema, auth: true });
+export function updateUser(id: string, body: UserUpdate): Promise<UserAuthorizationUpdate> {
+  return request({ method: "PATCH", path: `/users/update/${encodeURIComponent(id)}/`, body, schema: UserAuthorizationUpdateSchema, auth: true });
 }
 
 export function deleteUser(id: string): Promise<Message> {

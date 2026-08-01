@@ -32,6 +32,7 @@
   "exports": {
     ".": "./dist/src/integration.js",
     "./api": "./dist/src/runtime/api/index.js",
+    "./authorization": "./dist/src/runtime/authorization.js",
     "./client": "./dist/src/runtime/client.js",
     "./browser-adapter": "./dist/src/runtime/browserAdapter.js",
     "./schemas": "./dist/src/runtime/schemas.js",

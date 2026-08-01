@@ -11,6 +11,7 @@ import { RefreshCw, Trash2 } from "lucide-react";
 import { useAuth } from "@mano8/astro-auth-m8/react";
 import { useSessions, useDashboard } from "@mano8/astro-auth-m8/hooks";
 import type { UsersActivity } from "@mano8/astro-auth-m8/schemas";
+import { hasSuperuserPrivileges } from "@mano8/astro-auth-m8/authorization";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -112,7 +113,7 @@ function activityAdded(stats: UsersActivity | null, model: string): number | und
 export function SessionsPanel({ labels }: { labels?: Partial<SessionsPanelLabels> }) {
   const t = { ...DEFAULT_LABELS, ...labels };
   const { user } = useAuth();
-  const isSuperuser = user?.is_superuser ?? false;
+  const isSuperuser = user ? hasSuperuserPrivileges(user.role, user.is_superuser) : false;
 
   const { current, reloadCurrent, sessions, reload: list, revoke, loading } = useSessions(false);
   const { activity: mine, reload: reloadMine } = useDashboard("me", false);
