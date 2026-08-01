@@ -14,8 +14,8 @@ vi.mock("../src/runtime/api/ops.js", () => opsApi);
 
 import { installFaAuthBrowserAdapter } from "../src/runtime/browserAdapter.js";
 
-// compatible per the current (T12-unrepointed) fa-auth-m8@1.0 contract.
-const COMPATIBLE_META = { contract: { version: "1.0" }, version: "1.1.0" };
+// compatible per the current fa-auth-m8@2.0 contract.
+const COMPATIBLE_META = { contract: { version: "2.0" }, version: "2.0.0" };
 
 async function flushPreflight() {
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -69,7 +69,7 @@ describe("installFaAuthBrowserAdapter", () => {
       await flushPreflight();
 
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain("fa-auth-m8@1.0");
+      expect(warn.mock.calls[0][0]).toContain("fa-auth-m8@2.0");
     });
 
     it("warns at most once for an unrecognized (unknown) /meta payload, even across repeated installs", async () => {

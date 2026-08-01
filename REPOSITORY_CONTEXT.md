@@ -33,8 +33,8 @@ is the foundation authentication plugin for `fa-ui-m8` and other M8 Astro apps.
 - Communicate with `fa-auth-m8` over HTTP only; never import service code.
 - Publish `@mano8/astro-auth-m8` and keep the `faAuthM8` package metadata,
   schemas, and compatibility checks aligned with the supported backend contract.
-- The current public backend contract is `fa-auth-m8@1.0`, tested with service
-  version `1.1.0` and supporting `>=1.0.0 <2.0.0`.
+- The current public backend contract is `fa-auth-m8@2.0`, tested with service
+  version `2.0.0` and supporting `>=2.0.0 <3.0.0`.
 - Export public modules only through explicit `package.json` subpaths.
 - Preserve the adapter and provider surface as a stable fleet boundary; breaking
   changes have fleet-wide consequences.
