@@ -127,7 +127,10 @@ describe("feature API wrappers", () => {
     await dashboard.getGlobalActivity();
     await ops.getAuthHealth();
     await ops.getJwks();
-    expect(requestMock.mock.calls.map(([arg]) => arg.path)).toEqual(["/dashboard/users/activity/current/", "/dashboard/users/activity/", "/health/", "/.well-known/jwks.json"]);
+    await ops.getServiceMeta();
+    expect(requestMock.mock.calls.map(([arg]) => arg.path)).toEqual(["/dashboard/users/activity/current/", "/dashboard/users/activity/", "/health/", "/.well-known/jwks.json", "/meta"]);
+    expect(requestMock).toHaveBeenLastCalledWith(expect.objectContaining({ method: "GET", path: "/meta", skipRefresh: true }));
+    expect(requestMock.mock.calls.at(-1)?.[0]).not.toHaveProperty("auth");
   });
 });
 

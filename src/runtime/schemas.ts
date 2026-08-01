@@ -286,6 +286,21 @@ export const HealthSchema = z.object({
 }).passthrough();
 export type Health = z.infer<typeof HealthSchema>;
 
+// GET /meta (public, in OpenAPI). Mirrors auth_sdk_m8's ServiceMeta — the
+// nested `contract` object is what compatibility.ts's getFaAuthM8Compatibility
+// reads. `passthrough` so an added backend field never breaks the preflight.
+export const ServiceMetaSchema = z.object({
+  service: z.string(),
+  version: z.string(),
+  api_version: z.string(),
+  contract: z.object({
+    name: z.string(),
+    version: z.string(),
+    range: z.string()
+  }).passthrough()
+}).passthrough();
+export type ServiceMeta = z.infer<typeof ServiceMetaSchema>;
+
 export const JwkSchema = z.object({
   kty: z.string()
 }).passthrough();

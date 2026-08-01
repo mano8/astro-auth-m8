@@ -32,6 +32,10 @@ assertFaAuthM8Compatibility(meta); // reads nested contract.version + version
 
 The helper also accepts flat fields (`auth_contract_version` / `contract_version` / `service_version`) for backends that surface metadata elsewhere.
 
+### Automatic preflight
+
+`installFaAuthBrowserAdapter` (wired in by this package's Astro integration on every page) runs a `GET {API_PREFIX}/meta` preflight itself, once per install, and calls `getFaAuthM8Compatibility` (not the throwing assert) on the result. An incompatible contract or service version logs one `console.warn` naming the expected contract/range; an unrecognized (`"unknown"`) `/meta` payload warns at most once per page. Neither case throws or blocks adapter setup, and a `/meta` fetch failure (offline, CORS, a pre-1.0 backend without the route) is swallowed silently, since the preflight is advisory only. Hosts that want a hard version gate instead should still call `assertFaAuthM8Compatibility` themselves — it is exported unchanged and throws on `"incompatible"` (and on `"unknown"` unless `requireKnown` is passed `false`).
+
 ## Authorization predicates
 
 `@mano8/astro-auth-m8/authorization` is the single place this package encodes the role hierarchy and the role/`is_superuser` cross-field invariant. It mirrors the backend's canonical `auth_sdk_m8.authorization` module, so client-side gating cannot drift from what the server enforces.
