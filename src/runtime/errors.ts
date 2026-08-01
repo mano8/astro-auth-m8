@@ -63,6 +63,52 @@ export interface ApiErrorPresentation {
 const LAST_SUPERUSER_REQUIRED = "last_superuser_required";
 
 /**
+ * Maps one `fa-auth-m8` status to its operator-facing presentation. `detail` is
+ * the response detail only when it is a string, since every mapping that reads
+ * it needs display text. Returning `undefined` means "this status has no
+ * special meaning for this detail" and hands the error back to the generic
+ * fallback chain - which is how an unrelated `409` (e.g. a duplicate email)
+ * keeps its own message instead of being mislabelled.
+ */
+type ApiErrorPresenter = (detail: string | undefined, fallback: string) => ApiErrorPresentation | undefined;
+
+/**
+ * One entry per mapped status. Kept as a table rather than a chain of `if`s so
+ * a new contract is a new row, and so each mapping can be read - and reviewed
+ * against the backend route that produces it - on its own.
+ */
+const API_ERROR_PRESENTERS = new Map<number, ApiErrorPresenter>([
+  [400, (detail) => (detail ? { title: "Rejected", description: detail } : undefined)],
+  [403, (detail, fallback) => ({ title: "Role change not allowed", description: detail ?? fallback })],
+  [
+    409,
+    (detail) =>
+      detail === LAST_SUPERUSER_REQUIRED
+        ? {
+            title: "Last superuser required",
+            description:
+              "This is the only remaining superuser account, so it can't be changed or removed."
+          }
+        : undefined
+  ],
+  [
+    429,
+    () => ({
+      title: "Too many requests",
+      description: "Try again later - this action was not attempted."
+    })
+  ],
+  [
+    503,
+    () => ({
+      title: "Temporarily unavailable",
+      description:
+        "The outcome of this action is unknown. Do not retry until you've confirmed its status."
+    })
+  ]
+]);
+
+/**
  * Map a `fa-auth-m8` 2.0.0 authorization/rate-limit/retention error to an
  * operator-readable presentation. Covers the role-change error contracts
  * shared by `PATCH /users/update/{id}/` and `DELETE /users/delete/{id}/`
@@ -89,37 +135,8 @@ const LAST_SUPERUSER_REQUIRED = "last_superuser_required";
 export function describeApiError(error: unknown, fallback: string): ApiErrorPresentation {
   if (error instanceof ApiError) {
     const detail = typeof error.detail === "string" ? error.detail : undefined;
-
-    if (error.status === 403) {
-      return { title: "Role change not allowed", description: detail ?? fallback };
-    }
-
-    if (error.status === 409 && detail === LAST_SUPERUSER_REQUIRED) {
-      return {
-        title: "Last superuser required",
-        description:
-          "This is the only remaining superuser account, so it can't be changed or removed.",
-      };
-    }
-
-    if (error.status === 429) {
-      return {
-        title: "Too many requests",
-        description: "Try again later - this action was not attempted.",
-      };
-    }
-
-    if (error.status === 503) {
-      return {
-        title: "Temporarily unavailable",
-        description:
-          "The outcome of this action is unknown. Do not retry until you've confirmed its status.",
-      };
-    }
-
-    if (error.status === 400 && detail) {
-      return { title: "Rejected", description: detail };
-    }
+    const presented = API_ERROR_PRESENTERS.get(error.status)?.(detail, fallback);
+    if (presented) return presented;
   }
 
   if (error instanceof Error && error.message) {

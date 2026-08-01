@@ -48,6 +48,7 @@ import {
   ConfirmDeleteDialog,
   errorMessage,
   useClientTable,
+  type UseClientTableOptions,
 } from "./account-crud";
 
 export interface SecurityPanelLabels {
@@ -153,6 +154,113 @@ function formatDate(value: string | null | undefined, fallback: string): string 
   return value ? new Date(value).toLocaleString() : fallback;
 }
 
+// Raw identifiers are shown verbatim in a mono face: they are what an operator
+// correlates against the service's own logs, so they are never truncated.
+function monoCell(value: string | null | undefined, fallback: string) {
+  return <span className="font-mono text-xs">{value ?? fallback}</span>;
+}
+
+// Human-readable, sortable columns.
+function auditDetailColumns(
+  t: SecurityPanelLabels,
+): ColumnDef<PrivilegedActionAuditPublic>[] {
+  return [
+    {
+      accessorKey: "created_at",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t.when} />
+      ),
+      cell: ({ row }) => formatDate(row.original.created_at, t.notAvailable),
+    },
+    {
+      accessorKey: "action",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t.action} />
+      ),
+      cell: ({ row }) => (
+        <Badge variant="outline" className="capitalize">
+          {row.original.action}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "table_name",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t.table} />
+      ),
+    },
+    {
+      accessorKey: "actor_role",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t.actorRole} />
+      ),
+      cell: ({ row }) => (
+        <span className="capitalize">{row.original.actor_role}</span>
+      ),
+    },
+  ];
+}
+
+// The three id columns differ only by which field they read, so they share one
+// builder rather than repeating the same cell three times.
+function auditIdentifierColumns(
+  t: SecurityPanelLabels,
+): ColumnDef<PrivilegedActionAuditPublic>[] {
+  const identifier = (
+    accessorKey: "row_pk" | "actor_user_id" | "target_owner_id",
+    header: string,
+  ): ColumnDef<PrivilegedActionAuditPublic> => ({
+    accessorKey,
+    header,
+    enableSorting: false,
+    cell: ({ row }) => monoCell(row.original[accessorKey], t.notAvailable),
+  });
+
+  return [
+    identifier("row_pk", t.row),
+    identifier("actor_user_id", t.actor),
+    identifier("target_owner_id", t.targetOwner),
+  ];
+}
+
+// Client-side search/sort behaviour for the audit rows. Static, so it is built
+// once here rather than on every render of the section.
+const AUDIT_TABLE_OPTIONS: UseClientTableOptions<PrivilegedActionAuditPublic> = {
+  search: (entry) => `${entry.action} ${entry.table_name} ${entry.actor_user_id}`,
+  sorters: {
+    created_at: (entry) => entry.created_at,
+    action: (entry) => entry.action,
+    actor_role: (entry) => entry.actor_role,
+    table_name: (entry) => entry.table_name,
+  },
+  initialSortBy: "created_at",
+  initialSortDir: "desc",
+};
+
+function AuditRefreshButton({
+  t,
+  reload,
+}: {
+  t: SecurityPanelLabels;
+  reload: () => Promise<unknown>;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={() => {
+        reload().catch((error) => {
+          accountToast.error(errorMessage(error, t.auditLoadFailed));
+        });
+      }}
+    >
+      <RotateCcw className="size-4" />
+      {t.refresh}
+    </Button>
+  );
+}
+
 function AuditLogSection({ t }: { t: SecurityPanelLabels }) {
   // No actor filter is sent: the service scopes the rows from the caller's own
   // credentials, and passing one here could only ever ask for someone else's.
@@ -162,80 +270,9 @@ function AuditLogSection({ t }: { t: SecurityPanelLabels }) {
     reload().catch(() => {});
   }, [reload]);
 
-  const controller = useClientTable(rows, {
-    search: (entry) => `${entry.action} ${entry.table_name} ${entry.actor_user_id}`,
-    sorters: {
-      created_at: (entry) => entry.created_at,
-      action: (entry) => entry.action,
-      actor_role: (entry) => entry.actor_role,
-      table_name: (entry) => entry.table_name,
-    },
-    initialSortBy: "created_at",
-    initialSortDir: "desc",
-  });
-
-  const columns = React.useMemo<ColumnDef<PrivilegedActionAuditPublic>[]>(
-    () => [
-      {
-        accessorKey: "created_at",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t.when} />
-        ),
-        cell: ({ row }) => formatDate(row.original.created_at, t.notAvailable),
-      },
-      {
-        accessorKey: "action",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t.action} />
-        ),
-        cell: ({ row }) => (
-          <Badge variant="outline" className="capitalize">
-            {row.original.action}
-          </Badge>
-        ),
-      },
-      {
-        accessorKey: "table_name",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t.table} />
-        ),
-      },
-      {
-        accessorKey: "row_pk",
-        header: t.row,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">{row.original.row_pk}</span>
-        ),
-      },
-      {
-        accessorKey: "actor_role",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t.actorRole} />
-        ),
-        cell: ({ row }) => (
-          <span className="capitalize">{row.original.actor_role}</span>
-        ),
-      },
-      {
-        accessorKey: "actor_user_id",
-        header: t.actor,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">{row.original.actor_user_id}</span>
-        ),
-      },
-      {
-        accessorKey: "target_owner_id",
-        header: t.targetOwner,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">
-            {row.original.target_owner_id ?? t.notAvailable}
-          </span>
-        ),
-      },
-    ],
+  const controller = useClientTable(rows, AUDIT_TABLE_OPTIONS);
+  const columns = React.useMemo(
+    () => [...auditDetailColumns(t), ...auditIdentifierColumns(t)],
     [t],
   );
 
@@ -267,21 +304,7 @@ function AuditLogSection({ t }: { t: SecurityPanelLabels }) {
             empty: t.empty,
             toolbar: { search: t.search },
           }}
-          addButton={
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                reload().catch((error) => {
-                  accountToast.error(errorMessage(error, t.auditLoadFailed));
-                });
-              }}
-            >
-              <RotateCcw className="size-4" />
-              {t.refresh}
-            </Button>
-          }
+          addButton={<AuditRefreshButton t={t} reload={reload} />}
         />
       </CardContent>
     </Card>
