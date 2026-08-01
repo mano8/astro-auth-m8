@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { createUser, deleteUser, getUser, listUsers, signupUser, updateUser } from "../api/users.js";
 import { refetchOrThrow } from "./queryHelpers.js";
+import { emitAuthRevocation } from "../authEvents.js";
 import { authKeys } from "../queryKeys.js";
 import type { UserAuthorizationUpdate, UserCreate, UserRegister, UserUpdate, UsersPublic } from "../schemas.js";
 
@@ -33,10 +34,29 @@ export function useUsers(load = true) {
     onSuccess: async (updatedUser, variables) => {
       queryClient.setQueryData(authKeys.user(variables.id), updatedUser);
       queryClient.setQueryData(authKeys.user(updatedUser.id), updatedUser);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: authKeys.users() }),
-        queryClient.invalidateQueries({ queryKey: authKeys.user(variables.id) })
-      ]);
+
+      const staleKeys: QueryKey[] = [authKeys.users(), authKeys.user(variables.id)];
+      // AA-11: `revocation_enqueued` reports that the target's sessions were
+      // revoked and an authorization-generation bump is propagating, so every
+      // cached view of that principal's privileges is stale - dropping it is
+      // what stops a demoted user rendering privileged UI from cache. The
+      // owner-scoped profile/session/key caches are invalidated too: this layer
+      // cannot tell whether the target is the signed-in principal, and a
+      // redundant refetch is strictly safer than a stale privileged view.
+      if (updatedUser.revocation_enqueued) {
+        staleKeys.push(
+          authKeys.profile(),
+          authKeys.sessions(),
+          authKeys.apiKeys(),
+          authKeys.adminApiKeys(variables.id)
+        );
+      }
+      await Promise.all(staleKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+
+      // The provider holds the signed-in user in memory, outside this cache;
+      // notify it so it re-reads the profile instead of waiting for the next
+      // incidental `getProfile()`. It ignores every other user id.
+      if (updatedUser.revocation_enqueued) emitAuthRevocation(variables.id);
     }
   });
   const removeMutation = useMutation({

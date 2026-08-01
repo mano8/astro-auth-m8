@@ -13,7 +13,11 @@ import {
   useAuth,
   type AuthContextValue,
 } from "@mano8/astro-auth-m8/react";
-import { hasSuperuserPrivileges } from "@mano8/astro-auth-m8/authorization";
+import {
+  hasMinimumRole,
+  hasSuperuserPrivileges,
+} from "@mano8/astro-auth-m8/authorization";
+import type { RoleType } from "@mano8/astro-auth-m8/schemas";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +39,14 @@ export interface AccountTab {
   content: React.ReactNode;
   /** Only render this tab when the signed-in user is a superuser. */
   superuserOnly?: boolean;
+  /**
+   * Only render this tab when the signed-in user holds at least this role.
+   * Uses the ordered hierarchy, so `minRole: "admin"` also admits a superadmin.
+   * This is the admin tier: `fa-auth-m8` 2.0.0 authorizes the audit-log read
+   * from the role hierarchy alone, so gating it with `superuserOnly` would hide
+   * an admin's own surface from them.
+   */
+  minRole?: RoleType;
 }
 
 export interface AccountDashboardLabels {
@@ -91,8 +103,16 @@ function AccountShell({
     );
   }
 
+  // Two deliberately different predicates: `superuserOnly` needs dual evidence
+  // (role + is_superuser), `minRole` is the role hierarchy alone - the same
+  // split the backend makes between its superuser and admin dependencies.
+  // Each is only a display gate; every panel still self-gates and the service
+  // stays the authority.
   const visibleTabs = extraTabs.filter(
-    (tab) => !tab.superuserOnly || hasSuperuserPrivileges(user.role, user.is_superuser),
+    (tab) =>
+      (!tab.superuserOnly ||
+        hasSuperuserPrivileges(user.role, user.is_superuser)) &&
+      (!tab.minRole || hasMinimumRole(user.role, tab.minRole)),
   );
   const [activeTab, setActiveTab] = React.useState<string>("dashboard");
   const navItems = [

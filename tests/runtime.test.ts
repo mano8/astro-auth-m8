@@ -7,6 +7,7 @@ import { clearToken, getToken, runRefresh, setToken } from "../src/runtime/token
 import { authUrl, request } from "../src/runtime/client.js";
 import { MessageSchema, TokenSchema } from "../src/runtime/schemas.js";
 import { onRequest } from "../src/middleware.js";
+import { AUTH_REVOCATION_EVENT, emitAuthRevocation, type AuthRevocationDetail } from "../src/runtime/authEvents.js";
 
 const jsonResponse = (body: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" }, ...init });
 const sourceFile = (path: string) => readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), "utf8");
@@ -215,5 +216,25 @@ describe("middleware", () => {
     expect(result.status).toBe(302);
     expect(result.statusText).toBe("Found");
     vi.unstubAllEnvs();
+  });
+});
+
+describe("auth events", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("dispatches a revocation notification in a browser and no-ops outside one", () => {
+    // Node environment: no `window`, so the emit must be a silent no-op rather
+    // than throwing during SSR.
+    expect(() => emitAuthRevocation("11111111-1111-4111-8111-111111111111")).not.toThrow();
+
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal("window", { dispatchEvent });
+    emitAuthRevocation("11111111-1111-4111-8111-111111111111");
+    expect(dispatchEvent).toHaveBeenCalledTimes(1);
+    const event = dispatchEvent.mock.calls[0][0] as CustomEvent<AuthRevocationDetail>;
+    expect(event.type).toBe(AUTH_REVOCATION_EVENT);
+    expect(event.detail).toEqual({ userId: "11111111-1111-4111-8111-111111111111" });
   });
 });

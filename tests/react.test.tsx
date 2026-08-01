@@ -23,7 +23,7 @@ vi.mock("../src/runtime/api/sessions.js", () => sessionApi);
 vi.mock("../src/runtime/api/users.js", () => userApi);
 vi.mock("../src/runtime/api/oauth.js", () => oauthApi);
 
-import { AuthProvider, AuthQueryProvider, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
+import { AUTH_REVOCATION_EVENT, AuthProvider, AuthQueryProvider, emitAuthRevocation, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
 import { AccountView, CallbackView, LoginForm, LoginView, SignupView, StarterAccountPage, StarterLoginPage } from "../src/runtime/react/default-ui/index.js";
 import { useAdminApiKeys, useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
 import { useDashboard } from "../src/runtime/hooks/useDashboard.js";
@@ -264,6 +264,48 @@ describe("AuthProvider and guards", () => {
     view.unmount();
   });
 
+  it("re-reads the signed-in principal's claims when its authorization is revoked", async () => {
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <><span>{auth.user?.role ?? "none"}</span><RequireRole superuser fallback={<b>denied</b>}><em>super</em></RequireRole></>;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user).not.toBeNull());
+    expect(view.container.textContent).toContain("super");
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+
+    // The demotion the operator just applied elsewhere: the provider must pick
+    // up the new claims from the notification, not from the next incidental
+    // profile read, and the superuser UI must be gone once it has.
+    profileApi.getProfile.mockResolvedValueOnce({ ...user, role: "user" as const, is_superuser: false });
+    await act(async () => { emitAuthRevocation(user.id); });
+    await waitFor(() => expect(auth!.user?.role).toBe("user"));
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(2);
+    expect(auth!.loading).toBe(false);
+    expect(view.container.textContent).toContain("denied");
+    expect(view.container.textContent).not.toContain("super");
+    view.unmount();
+  });
+
+  it("ignores revocations aimed at another principal or carrying no detail", async () => {
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user).not.toBeNull());
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+
+    await act(async () => { emitAuthRevocation("22222222-2222-4222-8222-222222222222"); });
+    await act(async () => { window.dispatchEvent(new Event(AUTH_REVOCATION_EVENT)); });
+    await flush();
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+    expect(auth!.user?.role).toBe("superadmin");
+    view.unmount();
+  });
+
   it("handles bootstrap and reload errors, disabled bootstrap, fallback branches, and missing provider", async () => {
     profileApi.getProfile.mockRejectedValueOnce(new Error("profile failed"));
     let auth: ReturnType<typeof useAuth> | undefined;
@@ -433,6 +475,40 @@ describe("hooks", () => {
     await act(async () => { await expect(dash!.reload()).rejects.toThrow("dash failed"); });
     await act(async () => { await expect(usersHook!.reload()).rejects.toThrow("users failed"); });
     await act(async () => { await expect(sessionsHook!.reload()).rejects.toThrow("sessions failed"); });
+    view.unmount();
+  });
+
+  it("drops the authorization caches and notifies the provider on a revoking update", async () => {
+    let usersHook: ReturnType<typeof useUsers>;
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const revocations: string[] = [];
+    const onRevocation = (event: Event) => {
+      revocations.push((event as CustomEvent<{ userId: string }>).detail.userId);
+    };
+    window.addEventListener(AUTH_REVOCATION_EVENT, onRevocation);
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useUsers(false)} expose={(v) => { usersHook = v; }} /></HookHarnessWithClient>);
+
+    userApi.updateUser.mockResolvedValueOnce({ ...user, role: "user", is_superuser: false, auth_generation: 4, revocation_enqueued: true });
+    await act(async () => { await usersHook!.update(user.id, { role: "user" }); });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.profile() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.sessions() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.apiKeys() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.adminApiKeys(user.id) });
+    expect(revocations).toEqual([user.id]);
+
+    // An update the backend did not revoke anything for leaves the
+    // session-scoped caches (and the provider) alone.
+    invalidateSpy.mockClear();
+    userApi.updateUser.mockResolvedValueOnce({ ...user, auth_generation: 4, revocation_enqueued: false });
+    await act(async () => { await usersHook!.update(user.id, { full_name: "Ada Lovelace" }); });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.users() });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: authKeys.profile() });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: authKeys.sessions() });
+    expect(revocations).toEqual([user.id]);
+
+    window.removeEventListener(AUTH_REVOCATION_EVENT, onRevocation);
     view.unmount();
   });
 

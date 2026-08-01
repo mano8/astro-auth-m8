@@ -75,6 +75,21 @@ import { useAdminApiKeys, useAuditLog, useSecurityPurges } from "@mano8/astro-au
 
 `GET /security/superuser-probe` is deliberately not wrapped - it is the `security-tests-m8` harness canary, not a client surface. The four `/security/*` routes are excluded from the backend's OpenAPI schema (`include_in_schema=False`); their shapes here are recorded from the backend source and a live/tested response, not schema-generated.
 
+The ready-made skin for both tiers is the `security-panel` registry item (see [Items](#items)); `AccountTab.minRole` on `account-dashboard` is how an admin-tier tab is declared in the account shell, alongside the existing superuser-only `superuserOnly`.
+
+### Revocation signals
+
+`PATCH /users/update/{id}/` answers with `revocation_enqueued`. When it is `true`, that user's sessions have already been revoked and an authorization-generation bump is propagating, so any client state describing its privileges is stale on arrival. `useUsers().update` therefore invalidates the affected auth caches (profile, sessions, API keys, that user's admin key list) and emits a revocation notification:
+
+```ts
+import { AUTH_REVOCATION_EVENT, emitAuthRevocation } from "@mano8/astro-auth-m8/react";
+
+// Only needed if you bypass `useUsers` with your own mutation layer.
+emitAuthRevocation(updated.id);
+```
+
+A mounted `AuthProvider` listens for it and, when the id is the signed-in principal's, re-reads the profile immediately rather than waiting for the next incidental `getProfile()`. It raises `loading` while doing so, so `RequireRole`/`RequireAuth` fall back instead of rendering privileged UI from superseded claims. Notifications for any other user id are ignored. The backend remains the authority; this only stops a stale client view outliving the change.
+
 ## Modes
 
 - `headless`: exports typed schemas, API wrappers, token handling, React provider/hooks, and route helpers without injecting pages.
@@ -129,8 +144,11 @@ Install `@mano8/astro-auth-m8` from npm first, then consume the registry as a **
 | `account-crud` | `npx shadcn add ./node_modules/@mano8/astro-auth-m8/registry/r/account-crud.json` | `button`, `dialog`, `alert-dialog`, `astro-ui-m8` data-table and toast | `lucide-react` | no |
 | `api-keys-panel` | `npx shadcn add ./node_modules/@mano8/astro-auth-m8/registry/r/api-keys-panel.json` | `card`, `button`, `input`, `label`, `badge`, `dialog`, `account-crud`, `astro-ui-m8` data-table | `lucide-react`, `@tanstack/react-table` | **yes** (`useApiKeys`) |
 | `admin-users-panel` | `npx shadcn add ./node_modules/@mano8/astro-auth-m8/registry/r/admin-users-panel.json` | `card`, `button`, `input`, `label`, `badge`, `dialog`, `account-crud`, `astro-ui-m8` data-table | `lucide-react`, `@tanstack/react-table` | **yes** (`RequireRole`, `useUsers`) |
+| `security-panel` | `npx shadcn add ./node_modules/@mano8/astro-auth-m8/registry/r/security-panel.json` | `card`, `button`, `label`, `badge`, `account-crud`, `astro-ui-m8` data-table | `lucide-react`, `@tanstack/react-table` | **yes** (`RequireRole`, `useAuditLog`, `useSecurityPurges`) |
 
-`dashboard-overview` is the landing view; `profile-panel`, `sessions-panel`, `api-keys-panel`, and `admin-users-panel` are the secondary account tabs (drop them into `account-dashboard`'s `extraTabs`, or into your own shell). Each reads its headless logic straight from the package hooks - no local adapter layer - and takes its strings via `labels`. `api-keys-panel` and `admin-users-panel` use the canonical `astro-ui-m8` data-table with client-side search, sorting, pagination, column visibility, and row selection. Their shared `account-crud` dependency is installed automatically; it supplies the popup form, destructive-action confirmation, fixed row actions, and bottom-right toast host. `admin-users-panel` self-gates with `RequireRole superuser`.
+`dashboard-overview` is the landing view; `profile-panel`, `sessions-panel`, `api-keys-panel`, `admin-users-panel`, and `security-panel` are the secondary account tabs (drop them into `account-dashboard`'s `extraTabs`, or into your own shell). Each reads its headless logic straight from the package hooks - no local adapter layer - and takes its strings via `labels`. `api-keys-panel` and `admin-users-panel` use the canonical `astro-ui-m8` data-table with client-side search, sorting, pagination, column visibility, and row selection. Their shared `account-crud` dependency is installed automatically; it supplies the popup form, destructive-action confirmation, fixed row actions, and bottom-right toast host. `admin-users-panel` self-gates with `RequireRole superuser`.
+
+`security-panel` carries both 2.0.0 admin tiers in one tab and gates them differently, mirroring the service: the audit log is behind `RequireRole roles={["admin"]}` (role hierarchy alone, so an admin sees its own surface and a superadmin is admitted too) and the two retention purges are behind `RequireRole superuser` (dual evidence). Each purge picks its window from the closed `RetentionWindowSchema` enum and runs only through a confirmation that names what is deleted and that a window below the service's retention floor is refused - the floor is server-side configuration published by no endpoint, so the service's rejection is surfaced verbatim instead of pre-validated. A `503` locks the purge control and reports the outcome as *unknown* until the operator explicitly acknowledges having checked, so the next click can never be a blind retry. Drop it into `account-dashboard`'s `extraTabs` with `minRole: "admin"`.
 
 Files land under `src/components/fa-auth/` (the items' `target`), import shadcn primitives via `@/components/ui/*`, and pull headless logic from the installed package. The plugin package is intentionally **not** listed in registry item `dependencies`; install the published `@mano8/astro-auth-m8` package from npm yourself so shadcn only copies the skin files.
 
