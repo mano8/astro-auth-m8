@@ -7,8 +7,9 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 
 const authApi = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), refreshToken: vi.fn() }));
 const profileApi = vi.hoisted(() => ({ deleteProfile: vi.fn(), getProfile: vi.fn(), updatePassword: vi.fn(), updateProfile: vi.fn() }));
-const apiKeyApi = vi.hoisted(() => ({ listApiKeys: vi.fn(), createApiKey: vi.fn(), revokeApiKey: vi.fn() }));
+const apiKeyApi = vi.hoisted(() => ({ listApiKeys: vi.fn(), createApiKey: vi.fn(), revokeApiKey: vi.fn(), adminListUserApiKeys: vi.fn(), adminRevokeApiKey: vi.fn() }));
 const dashboardApi = vi.hoisted(() => ({ getGlobalActivity: vi.fn(), getUserActivity: vi.fn() }));
+const securityApi = vi.hoisted(() => ({ getAuditLog: vi.fn(), purgeAuditLog: vi.fn(), purgeApiKeys: vi.fn() }));
 const sessionApi = vi.hoisted(() => ({ getCurrentSession: vi.fn(), listSessions: vi.fn(), revokeSession: vi.fn() }));
 const userApi = vi.hoisted(() => ({ createUser: vi.fn(), deleteUser: vi.fn(), getUser: vi.fn(), listUsers: vi.fn(), signupUser: vi.fn(), updateUser: vi.fn() }));
 const oauthApi = vi.hoisted(() => ({ createPkcePair: vi.fn(), getGoogleLoginUrl: vi.fn(), savePkceVerifier: vi.fn(), exchangeGoogleCode: vi.fn(), takePkceVerifier: vi.fn() }));
@@ -17,16 +18,18 @@ vi.mock("../src/runtime/api/auth.js", () => authApi);
 vi.mock("../src/runtime/api/profile.js", () => profileApi);
 vi.mock("../src/runtime/api/apiKeys.js", () => apiKeyApi);
 vi.mock("../src/runtime/api/dashboard.js", () => dashboardApi);
+vi.mock("../src/runtime/api/security.js", () => securityApi);
 vi.mock("../src/runtime/api/sessions.js", () => sessionApi);
 vi.mock("../src/runtime/api/users.js", () => userApi);
 vi.mock("../src/runtime/api/oauth.js", () => oauthApi);
 
 import { AuthProvider, AuthQueryProvider, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
 import { AccountView, CallbackView, LoginForm, LoginView, SignupView, StarterAccountPage, StarterLoginPage } from "../src/runtime/react/default-ui/index.js";
-import { useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
+import { useAdminApiKeys, useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
 import { useDashboard } from "../src/runtime/hooks/useDashboard.js";
 import { useGoogleLogin } from "../src/runtime/hooks/useGoogleLogin.js";
 import { useProfile } from "../src/runtime/hooks/useProfile.js";
+import { useAuditLog, useSecurityPurges } from "../src/runtime/hooks/useSecurity.js";
 import { useSessions } from "../src/runtime/hooks/useSessions.js";
 import { useUsers } from "../src/runtime/hooks/useUsers.js";
 import { authKeys } from "../src/runtime/queryKeys.js";
@@ -120,6 +123,17 @@ beforeEach(() => {
   apiKeyApi.listApiKeys.mockResolvedValue([{ id: "11111111-1111-4111-8111-111111111112", name: "key", expires_at: null, revoked: false, last_used_at: null }]);
   apiKeyApi.createApiKey.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111113", name: "new", expires_at: null, revoked: false, last_used_at: null, plaintext: "secret" });
   apiKeyApi.revokeApiKey.mockResolvedValue({ message: "revoked" });
+  apiKeyApi.adminListUserApiKeys.mockResolvedValue({
+    data: [{ id: "11111111-1111-4111-8111-111111111115", name: "admin-key", user_id: user.id, revoked: false, expires_at: null, last_used_at: null, created_at: "2026-06-15T00:00:00Z", access_mode: "read_only", status: "active", audiences: [] }],
+    count: 1
+  });
+  apiKeyApi.adminRevokeApiKey.mockResolvedValue({ message: "revoked" });
+  securityApi.getAuditLog.mockResolvedValue({
+    data: [{ id: "11111111-1111-4111-8111-111111111116", created_at: "2026-06-15T00:00:00Z", actor_user_id: user.id, actor_role: "superadmin", action: "delete", table_name: "m8_api_key", row_pk: "11111111-1111-4111-8111-111111111115", target_owner_id: user.id }],
+    count: 1
+  });
+  securityApi.purgeAuditLog.mockResolvedValue({ window: "1m", removed: 3 });
+  securityApi.purgeApiKeys.mockResolvedValue({ window: "1m", removed: 2 });
   dashboardApi.getUserActivity.mockResolvedValue({ nb_users: 1, activity: { min: 0, max: 1, activity: [] } });
   dashboardApi.getGlobalActivity.mockResolvedValue({ nb_users: 2, activity: { min: 0, max: 2, activity: [] } });
   sessionApi.getCurrentSession.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111114", provider: "password", user_agent: null, ip_address: null, created_at: "2026-06-25T10:00:00Z", last_seen_at: "2026-06-25T10:00:00Z", expires_at: "2026-06-26T10:00:00Z" });
@@ -419,6 +433,49 @@ describe("hooks", () => {
     await act(async () => { await expect(dash!.reload()).rejects.toThrow("dash failed"); });
     await act(async () => { await expect(usersHook!.reload()).rejects.toThrow("users failed"); });
     await act(async () => { await expect(sessionsHook!.reload()).rejects.toThrow("sessions failed"); });
+    view.unmount();
+  });
+
+  it("covers the admin API-key hook success and error paths", async () => {
+    let hook: ReturnType<typeof useAdminApiKeys>;
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useAdminApiKeys(user.id, false)} expose={(v) => { hook = v; }} /></HookHarnessWithClient>);
+    await act(async () => { await hook!.reload(); });
+    await waitFor(() => expect(hook!.apiKeys).toHaveLength(1));
+    expect(hook!.count).toBe(1);
+    await act(async () => { await hook!.revoke("11111111-1111-4111-8111-111111111115"); });
+    expect(apiKeyApi.adminRevokeApiKey.mock.calls[0][0]).toBe("11111111-1111-4111-8111-111111111115");
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.adminApiKeys(user.id) });
+    apiKeyApi.adminListUserApiKeys.mockRejectedValueOnce(new Error("admin keys failed"));
+    await act(async () => { await expect(hook!.reload()).rejects.toThrow("admin keys failed"); });
+    view.unmount();
+  });
+
+  it("disables the admin API-key query when no userId is given", async () => {
+    let hook: ReturnType<typeof useAdminApiKeys>;
+    const view = render(<HookHarnessWithClient client={createTestQueryClient()}><HookProbe hook={() => useAdminApiKeys("")} expose={(v) => { hook = v; }} /></HookHarnessWithClient>);
+    expect(hook!.apiKeys).toEqual([]);
+    expect(apiKeyApi.adminListUserApiKeys).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("covers the audit-log read hook and both purge mutations", async () => {
+    let auditHook: ReturnType<typeof useAuditLog>;
+    let purgeHook: ReturnType<typeof useSecurityPurges>;
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const view = render(<HookHarnessWithClient client={client}><HookProbe hook={() => useAuditLog({}, false)} expose={(v) => { auditHook = v; }} /><HookProbe hook={() => useSecurityPurges()} expose={(v) => { purgeHook = v; }} /></HookHarnessWithClient>);
+    await act(async () => { await auditHook!.reload(); });
+    await waitFor(() => expect(auditHook!.rows).toHaveLength(1));
+    expect(auditHook!.count).toBe(1);
+    await act(async () => { await purgeHook!.purgeAudit("1m"); });
+    expect(securityApi.purgeAuditLog).toHaveBeenCalledWith({ window: "1m" });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: authKeys.auditLog() });
+    await act(async () => { await purgeHook!.purgeKeys("1y"); });
+    expect(securityApi.purgeApiKeys).toHaveBeenCalledWith({ window: "1y" });
+    securityApi.getAuditLog.mockRejectedValueOnce(new Error("audit log failed"));
+    await act(async () => { await expect(auditHook!.reload()).rejects.toThrow("audit log failed"); });
     view.unmount();
   });
 

@@ -60,6 +60,21 @@ const { title, description } = describeApiError(error, "Update failed");
 
 `403` self-promotion and `409` `last_superuser_required` are labelled (the raw `last_superuser_required` token is never surfaced); `429` and `503` are distinguished (rate limited vs. an unknown outcome that must not be retried); `400` free-text detail (e.g. a purge's retention-floor rejection) is surfaced verbatim under a labelled heading rather than pattern-matched.
 
+## Admin API-key and security surfaces (fa-auth-m8 2.0.0)
+
+`@mano8/astro-auth-m8/api` and `@mano8/astro-auth-m8/hooks` wrap the five 2.0.0 admin routes:
+
+```ts
+import { adminListUserApiKeys, adminRevokeApiKey, getAuditLog, purgeApiKeys, purgeAuditLog } from "@mano8/astro-auth-m8/api";
+import { useAdminApiKeys, useAuditLog, useSecurityPurges } from "@mano8/astro-auth-m8/hooks";
+```
+
+- `useAdminApiKeys(userId)` - superadmin-only list + revoke of another user's keys. Metadata only (`ApiKeyAdminPublic`, exported from `@mano8/astro-auth-m8/schemas`): adds `user_id` and a server-derived `status` (`active`/`revoked`/`expired`), omits `updated_at` - a distinct shape from the owner-facing `ApiKeyPublic`, never reused for it.
+- `useAuditLog(params)` - the read-only privileged-action audit trail. Gate with `hasMinimumRole(role, "admin")`, not the superuser predicate: an admin sees only the rows it authored, a superadmin sees every row, and the split is decided server-side from the authenticated principal - the client never sends an actor id to widen or narrow it.
+- `useSecurityPurges()` - both retention purges (`purgeAudit`, `purgeKeys`). The `window` is the closed enum `"1w" | "1m" | "3m" | "6m" | "1y"` (`RetentionWindowSchema`), never free text or a date. Gate with `hasSuperuserPrivileges`, a different predicate from the audit-log read. All three admin surfaces are rate limited: `429` means the action was not attempted (safe to retry later, never automatically); `503` means the outcome is *unknown* (do not retry); a purge's `400` is a free-text retention-floor rejection - see [Error presentation](#error-presentation) for how `describeApiError` maps all three.
+
+`GET /security/superuser-probe` is deliberately not wrapped - it is the `security-tests-m8` harness canary, not a client surface. The four `/security/*` routes are excluded from the backend's OpenAPI schema (`include_in_schema=False`); their shapes here are recorded from the backend source and a live/tested response, not schema-generated.
+
 ## Modes
 
 - `headless`: exports typed schemas, API wrappers, token handling, React provider/hooks, and route helpers without injecting pages.

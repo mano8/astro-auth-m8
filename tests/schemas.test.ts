@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiKeyCreatedSchema, ApiKeyCreateSchema, ApiKeyPublicSchema, ClientSessionPublicSchema, UserAuthorizationUpdateSchema, UserCreateSchema, UserUpdateMeSchema, UserUpdateSchema } from "../src/runtime/schemas.js";
+import { ApiKeyAdminPublicSchema, ApiKeyCreatedSchema, ApiKeyCreateSchema, ApiKeyPublicSchema, ApiKeysAdminPublicSchema, ClientSessionPublicSchema, PrivilegedActionAuditPublicSchema, PrivilegedActionAuditsPublicSchema, PurgeRequestSchema, PurgeResponseSchema, RetentionWindowSchema, UserAuthorizationUpdateSchema, UserCreateSchema, UserUpdateMeSchema, UserUpdateSchema } from "../src/runtime/schemas.js";
 
 describe("contract schemas", () => {
   it("keeps secret session fields out of the public session schema", () => {
@@ -115,5 +115,63 @@ describe("contract schemas", () => {
     expect(UserUpdateMeSchema.safeParse({ email: "a@example.com", full_name: "Ada", avatar: "https://example.com/avatar.png" }).success).toBe(true);
     expect(UserUpdateMeSchema.safeParse({ role: "admin" }).success).toBe(false);
     expect(UserUpdateMeSchema.safeParse({ is_superuser: true }).success).toBe(false);
+  });
+
+  it("parses the fa-auth-m8@2.0.0 admin API-key listing (AA-17), a distinct shape from ApiKeyPublic", () => {
+    const adminFixture = {
+      id: "4a9f083a-b23b-4823-9aa2-0d01875c4216",
+      name: "ci-deploy",
+      user_id: "5b9f083a-b23b-4823-9aa2-0d01875c4217",
+      revoked: false,
+      expires_at: null,
+      last_used_at: null,
+      created_at: "2026-06-15T00:00:00Z",
+      access_mode: "read_write",
+      status: "active",
+      audiences: ["media-service-m8"]
+    };
+
+    expect(ApiKeyAdminPublicSchema.safeParse(adminFixture).success).toBe(true);
+    expect(ApiKeyAdminPublicSchema.safeParse({ ...adminFixture, status: "unknown" }).success).toBe(false);
+    // Distinct from ApiKeyPublicSchema: no `updated_at`, but does carry `user_id` + `status`.
+    expect(ApiKeyPublicSchema.safeParse(adminFixture).success).toBe(false);
+
+    const listFixture = { data: [adminFixture], count: 1 };
+    expect(ApiKeysAdminPublicSchema.safeParse(listFixture).success).toBe(true);
+  });
+
+  it("models the closed retention-window enum and purge request/response contract (AA-19)", () => {
+    for (const window of ["1w", "1m", "3m", "6m", "1y"]) {
+      expect(RetentionWindowSchema.safeParse(window).success).toBe(true);
+    }
+    expect(RetentionWindowSchema.safeParse("1d").success).toBe(false);
+    expect(RetentionWindowSchema.safeParse("2026-01-01").success).toBe(false);
+
+    expect(PurgeRequestSchema.safeParse({ window: "3m" }).success).toBe(true);
+    expect(PurgeRequestSchema.safeParse({ window: "3m", extra: true }).success).toBe(false);
+
+    expect(PurgeResponseSchema.safeParse({ window: "1y", removed: 42 }).success).toBe(true);
+    expect(PurgeResponseSchema.safeParse({ window: "1y", removed: -1 }).success).toBe(false);
+  });
+
+  it("parses the privileged-action audit-log listing", () => {
+    const auditFixture = {
+      id: "4a9f083a-b23b-4823-9aa2-0d01875c4216",
+      created_at: "2026-06-15T00:00:00Z",
+      actor_user_id: "5b9f083a-b23b-4823-9aa2-0d01875c4217",
+      actor_role: "superadmin",
+      action: "delete",
+      table_name: "m8_api_key",
+      row_pk: "4a9f083a-b23b-4823-9aa2-0d01875c4218",
+      target_owner_id: "6c9f083a-b23b-4823-9aa2-0d01875c4219"
+    };
+
+    expect(PrivilegedActionAuditPublicSchema.safeParse(auditFixture).success).toBe(true);
+    expect(PrivilegedActionAuditPublicSchema.safeParse({ ...auditFixture, target_owner_id: null }).success).toBe(true);
+    const { target_owner_id: _omit, ...withoutOwner } = auditFixture;
+    expect(PrivilegedActionAuditPublicSchema.safeParse(withoutOwner).success).toBe(true);
+    expect(PrivilegedActionAuditPublicSchema.safeParse({ ...auditFixture, action: "read" }).success).toBe(false);
+
+    expect(PrivilegedActionAuditsPublicSchema.safeParse({ data: [auditFixture], count: 1 }).success).toBe(true);
   });
 });
