@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiKeyCreateSchema, ClientSessionPublicSchema, UserAuthorizationUpdateSchema, UserCreateSchema, UserUpdateMeSchema, UserUpdateSchema } from "../src/runtime/schemas.js";
+import { ApiKeyCreatedSchema, ApiKeyCreateSchema, ApiKeyPublicSchema, ClientSessionPublicSchema, UserAuthorizationUpdateSchema, UserCreateSchema, UserUpdateMeSchema, UserUpdateSchema } from "../src/runtime/schemas.js";
 
 describe("contract schemas", () => {
   it("keeps secret session fields out of the public session schema", () => {
@@ -19,8 +19,33 @@ describe("contract schemas", () => {
     expect(result.success).toBe(false);
   });
 
-  it("defaults API key ttl to the backend default", () => {
-    expect(ApiKeyCreateSchema.parse({}).ttl_hours).toBe(24);
+  it("defaults API key ttl and access_mode to the backend defaults", () => {
+    const parsed = ApiKeyCreateSchema.parse({});
+    expect(parsed.ttl_hours).toBe(24);
+    expect(parsed.access_mode).toBe("read_only");
+  });
+
+  it("accepts an explicit read_write access_mode and audiences on create, rejects an unknown mode", () => {
+    expect(ApiKeyCreateSchema.safeParse({ access_mode: "read_write", audiences: ["media-service-m8"] }).success).toBe(true);
+    expect(ApiKeyCreateSchema.safeParse({ access_mode: "admin" }).success).toBe(false);
+  });
+
+  it("parses fa-auth-m8@2.0.0 ApiKeyPublic/ApiKeyCreated fixtures with access_mode + audiences", () => {
+    const publicFixture = {
+      id: "4a9f083a-b23b-4823-9aa2-0d01875c4216",
+      name: "ci-deploy",
+      expires_at: null,
+      revoked: false,
+      last_used_at: null,
+      created_at: "2026-06-15T00:00:00Z",
+      updated_at: "2026-06-15T00:00:00Z",
+      access_mode: "read_write",
+      audiences: ["media-service-m8"]
+    };
+
+    expect(ApiKeyPublicSchema.safeParse(publicFixture).success).toBe(true);
+    expect(ApiKeyCreatedSchema.safeParse({ ...publicFixture, plaintext: "secret" }).success).toBe(true);
+    expect(ApiKeyPublicSchema.safeParse({ ...publicFixture, access_mode: "admin" }).success).toBe(false);
   });
 
   it("rejects is_superuser in create schema", () => {
