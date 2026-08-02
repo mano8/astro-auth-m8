@@ -6,7 +6,7 @@ describe("describeApiError", () => {
     const error = new ApiError(403, "A user may not raise their own role");
     const result = describeApiError(error, "Update failed");
 
-    expect(result.title).toBe("Role change not allowed");
+    expect(result.title).toBe("Not permitted");
     expect(result.description).toBe("A user may not raise their own role");
   });
 
@@ -14,8 +14,19 @@ describe("describeApiError", () => {
     const error = new ApiError(403, { code: "opaque" }, "Forbidden");
     const result = describeApiError(error, "Update failed");
 
-    expect(result.title).toBe("Role change not allowed");
+    expect(result.title).toBe("Not permitted");
     expect(result.description).toBe("Update failed");
+  });
+
+  it("does not label a non-role 403 as a role change", () => {
+    // A purge or audit-log read refused because the principal was demoted since
+    // the page loaded is still a 403, and must not be titled as a role change.
+    const error = new ApiError(403, "Not enough permissions");
+    const result = describeApiError(error, "Purge failed");
+
+    expect(result.title).toBe("Not permitted");
+    expect(result.title).not.toContain("Role change");
+    expect(result.description).toBe("Not enough permissions");
   });
 
   it("never surfaces the raw last_superuser_required token to the operator", () => {

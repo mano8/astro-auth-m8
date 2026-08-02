@@ -79,7 +79,14 @@ type ApiErrorPresenter = (detail: string | undefined, fallback: string) => ApiEr
  */
 const API_ERROR_PRESENTERS = new Map<number, ApiErrorPresenter>([
   [400, (detail) => (detail ? { title: "Rejected", description: detail } : undefined)],
-  [403, (detail, fallback) => ({ title: "Role change not allowed", description: detail ?? fallback })],
+  // Titled by status, not by cause: every mapped surface can produce a 403
+  // (a role change refused as self-promotion, but also an audit-log read or a
+  // purge attempted by a principal demoted since the page loaded), and the
+  // detail string that would distinguish them is not a stable contract. The
+  // backend's own 403 detail is already operator-readable ("A user may not
+  // raise their own role"), so it carries the specific cause as the
+  // description while the title never asserts one that may be wrong.
+  [403, (detail, fallback) => ({ title: "Not permitted", description: detail ?? fallback })],
   [
     409,
     (detail) =>
@@ -116,8 +123,11 @@ const API_ERROR_PRESENTERS = new Map<number, ApiErrorPresenter>([
  * retention-floor contracts every new admin surface (audit log, both purges)
  * shares with them, so callers do not each re-derive these mappings:
  *
- * - `403` - self-promotion: the backend's own detail text is already
- *   operator-readable, just labelled.
+ * - `403` - not permitted (e.g. a role change refused as self-promotion, or a
+ *   privileged read/purge attempted without the tier). Titled by status, since
+ *   several mapped surfaces produce a `403` and the detail that would tell them
+ *   apart is not a stable contract; the backend's own readable detail carries
+ *   the specific cause.
  * - `409` with detail `last_superuser_required` - the raw token is never
  *   surfaced; replaced with a labelled explanation.
  * - `429` - rate limited. The action was not attempted; safe to retry later,

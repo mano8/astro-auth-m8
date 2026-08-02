@@ -14,11 +14,11 @@ Part of the M8 auth stack: [mano8/astro-auth-m8](https://github.com/mano8/astro-
 npm install @mano8/astro-auth-m8
 ```
 
-Use it with a `fa-auth-m8` backend that satisfies the `fa-auth-m8@1.0` contract.
+Use it with a `fa-auth-m8` backend that satisfies the `fa-auth-m8@2.0` contract.
 
 ## Backend contract
 
-This package targets the `fa-auth-m8@1.0` API contract and was tested against `fa-auth-m8` service version `1.1.0`. Supported backend service versions are `>=1.0.0 <2.0.0`.
+This package targets the `fa-auth-m8@2.0` API contract and was tested against `fa-auth-m8` service version `2.0.0`. Supported backend service versions are `>=2.0.0 <3.0.0`.
 
 Compatibility helpers are exported from `@mano8/astro-auth-m8/compatibility`. `fa-auth-m8` (>= 1.0.0) exposes a public `GET {API_PREFIX}/meta` route returning a `ServiceMeta` payload - pass it straight to the assert:
 
@@ -31,6 +31,10 @@ assertFaAuthM8Compatibility(meta); // reads nested contract.version + version
 ```
 
 The helper also accepts flat fields (`auth_contract_version` / `contract_version` / `service_version`) for backends that surface metadata elsewhere.
+
+### Automatic preflight
+
+`installFaAuthBrowserAdapter` (wired in by this package's Astro integration on every page) runs a `GET {API_PREFIX}/meta` preflight itself, once per install, and calls `getFaAuthM8Compatibility` (not the throwing assert) on the result. An incompatible contract or service version logs one `console.warn` naming the expected contract/range; an unrecognized (`"unknown"`) `/meta` payload warns at most once per page. Neither case throws or blocks adapter setup, and a `/meta` fetch failure (offline, CORS, a pre-1.0 backend without the route) is swallowed silently, since the preflight is advisory only. Hosts that want a hard version gate instead should still call `assertFaAuthM8Compatibility` themselves — it is exported unchanged and throws on `"incompatible"` (and on `"unknown"` unless `requireKnown` is passed `false`).
 
 ## Authorization predicates
 
@@ -58,7 +62,7 @@ import { describeApiError } from "@mano8/astro-auth-m8/errors";
 const { title, description } = describeApiError(error, "Update failed");
 ```
 
-`403` self-promotion and `409` `last_superuser_required` are labelled (the raw `last_superuser_required` token is never surfaced); `429` and `503` are distinguished (rate limited vs. an unknown outcome that must not be retried); `400` free-text detail (e.g. a purge's retention-floor rejection) is surfaced verbatim under a labelled heading rather than pattern-matched.
+`409` `last_superuser_required` is labelled (the raw token is never surfaced); `403` is titled by status (`Not permitted`) with the backend's own readable detail as the description, since several surfaces produce a `403` and the detail that distinguishes them is not a stable contract; `429` and `503` are distinguished (rate limited vs. an unknown outcome that must not be retried); `400` free-text detail (e.g. a purge's retention-floor rejection) is surfaced verbatim under a labelled heading rather than pattern-matched.
 
 ## Admin API-key and security surfaces (fa-auth-m8 2.0.0)
 

@@ -1,6 +1,6 @@
 {
   "name": "@mano8/astro-auth-m8",
-  "version": "1.5.0",
+  "version": "2.0.0",
   "description": "Astro integration and headless client for fa-auth-m8.",
   "type": "module",
   "license": "MIT",
@@ -24,6 +24,7 @@
     "registry.json",
     "registry/r",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "bin": {
@@ -61,7 +62,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@mano8/astro-ui-m8": "^1.4.0"
+    "@mano8/astro-ui-m8": "^1.4.1"
   },
   "peerDependencies": {
     "@astrojs/react": "^6.0.1",
@@ -97,8 +98,8 @@
     "esbuild": "^0.28.1"
   },
   "faAuthM8": {
-    "contract": "fa-auth-m8@1.0",
-    "testedServiceVersion": "1.1.0",
-    "serviceVersionRange": ">=1.0.0 <2.0.0"
+    "contract": "fa-auth-m8@2.0",
+    "testedServiceVersion": "2.0.0",
+    "serviceVersionRange": ">=2.0.0 <3.0.0"
   }
 }
