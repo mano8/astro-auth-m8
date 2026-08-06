@@ -10,7 +10,7 @@
 // Two tiers, two deliberately different gates, mirroring fa-auth-m8 2.0.0:
 //   * the audit-log READ is authorized by the role hierarchy alone
 //     (`get_current_active_admin`), so it is gated with `RequireRole
-//     roles={["admin"]}` — gating it on superuser would hide an admin's own
+//     minimumRole="admin"` — gating it on superuser would hide an admin's own
 //     surface from them;
 //   * both PURGES are superuser actions (`get_current_active_superuser`), so
 //     they are gated with `RequireRole superuser` (dual evidence).
@@ -496,7 +496,7 @@ export function SecurityPanel({
       <AccountToastHost />
       {/* Admin tier: role hierarchy only, so a superadmin is admitted too. */}
       <RequireRole
-        roles={["admin"]}
+        minimumRole="admin"
         fallback={
           <p className="text-sm text-muted-foreground">{t.adminRequired}</p>
         }
