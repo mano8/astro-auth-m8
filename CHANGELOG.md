@@ -6,7 +6,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The major version tracks the supported `fa-auth-m8` **API contract**, not just
 this package's own surface: a backend contract repoint is always a major.
 
-## Unreleased
+## 2.1.0
 
 Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range
 `>=2.0.0 <3.0.0`.
