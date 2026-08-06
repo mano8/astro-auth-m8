@@ -52,6 +52,19 @@ hasSuperuserPrivileges(user.role, user.is_superuser);
 
 The valid role/flag pairs are `superadmin` with `is_superuser: true`, and every other role with `is_superuser: false`. `privilegeClaimsAreConsistent` exposes that invariant on its own, and `ORDERED_ROLES` exposes the hierarchy, highest privilege first. Any other pair - including an unrecognised role - grants nothing. These are display predicates; the backend stays the authority.
 
+All four are also re-exported from `@mano8/astro-auth-m8/react`, as the same bindings, so a consumer gating something that is not a subtree - a menu entry, a table row action, a `disabled` attribute - reaches the comparison from the subpath it already imports `RequireRole` from. Wherever a subtree *is* what you are gating, `RequireRole` is the shorter spelling:
+
+```tsx
+import { RequireRole } from "@mano8/astro-auth-m8/react";
+
+// Minimum-role mode: at least admin, so a superadmin is admitted too.
+<RequireRole minimumRole="admin" fallback={<p>Admin access required.</p>}>
+  <AuditLog />
+</RequireRole>
+```
+
+`minimumRole` is the form to reach for: it says what the backend dependency says. `roles={[...]}` remains for a guard that genuinely accepts several unrelated tiers - each entry is a floor there too, so `roles={["admin"]}` and `minimumRole="admin"` decide identically, but the array reads as exact membership and invites hand-enumeration. `superuser` is the separate dual-evidence gate. A guard may carry more than one mode and grants on the first that holds; one carrying none grants nothing.
+
 ## Error presentation
 
 `@mano8/astro-auth-m8/errors` exports `ApiError` plus `describeApiError(error, fallback)`, which maps the `fa-auth-m8` 2.0.0 authorization/rate-limit/retention error contracts to an operator-readable `{ title, description? }` (used by the `errorMessage` helper in the account registry blocks):
@@ -152,7 +165,7 @@ Install `@mano8/astro-auth-m8` from npm first, then consume the registry as a **
 
 `dashboard-overview` is the landing view; `profile-panel`, `sessions-panel`, `api-keys-panel`, `admin-users-panel`, and `security-panel` are the secondary account tabs (drop them into `account-dashboard`'s `extraTabs`, or into your own shell). Each reads its headless logic straight from the package hooks - no local adapter layer - and takes its strings via `labels`. `api-keys-panel` and `admin-users-panel` use the canonical `astro-ui-m8` data-table with client-side search, sorting, pagination, column visibility, and row selection. Their shared `account-crud` dependency is installed automatically; it supplies the popup form, destructive-action confirmation, fixed row actions, and bottom-right toast host. `admin-users-panel` self-gates with `RequireRole superuser`.
 
-`security-panel` carries both 2.0.0 admin tiers in one tab and gates them differently, mirroring the service: the audit log is behind `RequireRole roles={["admin"]}` (role hierarchy alone, so an admin sees its own surface and a superadmin is admitted too) and the two retention purges are behind `RequireRole superuser` (dual evidence). Each purge picks its window from the closed `RetentionWindowSchema` enum and runs only through a confirmation that names what is deleted and that a window below the service's retention floor is refused - the floor is server-side configuration published by no endpoint, so the service's rejection is surfaced verbatim instead of pre-validated. A `503` locks the purge control and reports the outcome as *unknown* until the operator explicitly acknowledges having checked, so the next click can never be a blind retry. Drop it into `account-dashboard`'s `extraTabs` with `minRole: "admin"`.
+`security-panel` carries both 2.0.0 admin tiers in one tab and gates them differently, mirroring the service: the audit log is behind `RequireRole minimumRole="admin"` (role hierarchy alone, so an admin sees its own surface and a superadmin is admitted too) and the two retention purges are behind `RequireRole superuser` (dual evidence). Each purge picks its window from the closed `RetentionWindowSchema` enum and runs only through a confirmation that names what is deleted and that a window below the service's retention floor is refused - the floor is server-side configuration published by no endpoint, so the service's rejection is surfaced verbatim instead of pre-validated. A `503` locks the purge control and reports the outcome as *unknown* until the operator explicitly acknowledges having checked, so the next click can never be a blind retry. Drop it into `account-dashboard`'s `extraTabs` with `minRole: "admin"`.
 
 Files land under `src/components/fa-auth/` (the items' `target`), import shadcn primitives via `@/components/ui/*`, and pull headless logic from the installed package. The plugin package is intentionally **not** listed in registry item `dependencies`; install the published `@mano8/astro-auth-m8` package from npm yourself so shadcn only copies the skin files.
 
