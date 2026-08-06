@@ -6,6 +6,18 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The major version tracks the supported `fa-auth-m8` **API contract**, not just
 this package's own surface: a backend contract repoint is always a major.
 
+## Unreleased
+
+Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range
+`>=2.0.0 <3.0.0`.
+
+### Changed
+
+- `compatibility.test.ts` now pins the published `faAuthM8` package-metadata
+  block against the `compatibility.ts` constants, so the machine-readable half
+  of the contract claim cannot drift from the half the browser preflight
+  enforces.
+
 ## 2.0.0
 
 Aligns the plugin with the `fa-auth-m8@2.0` contract (service `2.0.0`,
