@@ -79,6 +79,31 @@ describe("fa-auth-m8 compatibility contract", () => {
     ).toMatchObject({ status: "incompatible", contractVersion: "2.1" });
   });
 
+  it("admits the live fa-auth-m8 GET /meta payload verbatim", () => {
+    // Verbatim auth-sdk-m8 ServiceMeta as fa-auth-m8 serves it at
+    // {API_PREFIX}/meta, built from the issuer's own SERVICE_NAME, __version__
+    // and CONTRACT_* constants at HEAD. Hand-written flat fixtures are how the
+    // service-version and payload-shape axes drift unnoticed across the fleet.
+    const meta = {
+      service: "fa-auth-m8",
+      version: "2.0.3",
+      api_version: "v1",
+      contract: { name: "fa-auth-m8", version: "2.0", range: ">=2.0.0 <3.0.0" }
+    };
+    expect(getFaAuthM8Compatibility(meta)).toMatchObject({
+      status: "compatible",
+      contractVersion: "2.0",
+      serviceVersion: "2.0.3"
+    });
+    expect(() => assertFaAuthM8Compatibility(meta)).not.toThrow();
+
+    // Adjacent out-of-range service version on the same payload shape.
+    expect(getFaAuthM8Compatibility({ ...meta, version: "3.0.0" })).toMatchObject({
+      status: "incompatible",
+      serviceVersion: "3.0.0"
+    });
+  });
+
   it("rejects another service's /meta even when its contract version matches", () => {
     // Every M8 service serves this payload shape from the shared
     // auth-sdk-m8 `mount_service_meta` helper, so a host pointed at the wrong
