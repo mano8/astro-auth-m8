@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "fs";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import {
   assertFaAuthM8Compatibility,
   FA_AUTH_M8_CONTRACT,
@@ -9,12 +12,35 @@ import {
   isFaAuthM8ServiceVersionCompatible
 } from "../src/runtime/compatibility.js";
 
+const packageJson = JSON.parse(
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf-8")
+) as { faAuthM8?: { contract?: string; testedServiceVersion?: string; serviceVersionRange?: string } };
+
 describe("fa-auth-m8 compatibility contract", () => {
   it("exports the tested contract metadata", () => {
     expect(FA_AUTH_M8_CONTRACT).toBe("fa-auth-m8@2.0");
     expect(FA_AUTH_M8_CONTRACT_VERSION).toBe("2.0");
     expect(FA_AUTH_M8_TESTED_SERVICE_VERSION).toBe("2.0.0");
     expect(FA_AUTH_M8_SERVICE_VERSION_RANGE).toBe(">=2.0.0 <3.0.0");
+  });
+
+  // The `faAuthM8` block is the published, machine-readable half of the same
+  // claim `compatibility.ts` enforces at runtime: a host or a fleet tool reads
+  // the package metadata, the browser preflight reads the constants. Nothing
+  // else keeps the two halves together, so a contract repoint that edited one
+  // and forgot the other would ship a package that advertises a range it does
+  // not check. Pinned against the constants rather than against literals so the
+  // next repoint has exactly one place to edit.
+  it("keeps the published faAuthM8 package metadata identical to the constants", () => {
+    expect(packageJson.faAuthM8).toEqual({
+      contract: FA_AUTH_M8_CONTRACT,
+      testedServiceVersion: FA_AUTH_M8_TESTED_SERVICE_VERSION,
+      serviceVersionRange: FA_AUTH_M8_SERVICE_VERSION_RANGE
+    });
+  });
+
+  it("accepts the tested service version as in range", () => {
+    expect(isFaAuthM8ServiceVersionCompatible(FA_AUTH_M8_TESTED_SERVICE_VERSION)).toBe(true);
   });
 
   it("checks service version ranges", () => {
@@ -51,6 +77,31 @@ describe("fa-auth-m8 compatibility contract", () => {
     expect(
       getFaAuthM8Compatibility({ version: "2.0.0", contract: { version: "2.1" } })
     ).toMatchObject({ status: "incompatible", contractVersion: "2.1" });
+  });
+
+  it("admits the live fa-auth-m8 GET /meta payload verbatim", () => {
+    // Verbatim auth-sdk-m8 ServiceMeta as fa-auth-m8 serves it at
+    // {API_PREFIX}/meta, built from the issuer's own SERVICE_NAME, __version__
+    // and CONTRACT_* constants at HEAD. Hand-written flat fixtures are how the
+    // service-version and payload-shape axes drift unnoticed across the fleet.
+    const meta = {
+      service: "fa-auth-m8",
+      version: "2.0.3",
+      api_version: "v1",
+      contract: { name: "fa-auth-m8", version: "2.0", range: ">=2.0.0 <3.0.0" }
+    };
+    expect(getFaAuthM8Compatibility(meta)).toMatchObject({
+      status: "compatible",
+      contractVersion: "2.0",
+      serviceVersion: "2.0.3"
+    });
+    expect(() => assertFaAuthM8Compatibility(meta)).not.toThrow();
+
+    // Adjacent out-of-range service version on the same payload shape.
+    expect(getFaAuthM8Compatibility({ ...meta, version: "3.0.0" })).toMatchObject({
+      status: "incompatible",
+      serviceVersion: "3.0.0"
+    });
   });
 
   it("rejects another service's /meta even when its contract version matches", () => {

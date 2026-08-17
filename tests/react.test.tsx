@@ -23,7 +23,8 @@ vi.mock("../src/runtime/api/sessions.js", () => sessionApi);
 vi.mock("../src/runtime/api/users.js", () => userApi);
 vi.mock("../src/runtime/api/oauth.js", () => oauthApi);
 
-import { AUTH_REVOCATION_EVENT, AuthProvider, AuthQueryProvider, emitAuthRevocation, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
+import { AUTH_REVOCATION_EVENT, AuthProvider, AuthQueryProvider, emitAuthRevocation, ORDERED_ROLES, hasMinimumRole, hasSuperuserPrivileges, privilegeClaimsAreConsistent, RequireAuth, RequireRole, useAuth } from "../src/runtime/react/index.js";
+import * as authorizationModule from "../src/runtime/authorization.js";
 import { AccountView, CallbackView, LoginForm, LoginView, SignupView, StarterAccountPage, StarterLoginPage } from "../src/runtime/react/default-ui/index.js";
 import { useAdminApiKeys, useApiKeys } from "../src/runtime/hooks/useApiKeys.js";
 import { useDashboard } from "../src/runtime/hooks/useDashboard.js";
@@ -393,6 +394,123 @@ describe("AuthProvider and guards", () => {
     expect(auth!.user).toBeNull();
     await act(async () => { await auth!.login("ada@example.com", "password"); });
     second.unmount();
+  });
+});
+
+describe("RequireRole minimum-role mode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetAuthConfig();
+    authApi.refreshToken.mockResolvedValue({ access_token: "token" });
+    profileApi.getProfile.mockResolvedValue(user);
+  });
+
+  afterEach(() => {
+    resetAuthConfig();
+  });
+
+  // The re-export is the whole point of the item: a consumer gating something
+  // that is not a subtree must be able to reach the comparison from the same
+  // subpath it imports the guard from. Identity, not just presence - a second
+  // copy of the hierarchy is exactly what `RBAC-06` forbids.
+  it("re-exports the authorization primitives as the same bindings", () => {
+    expect(hasMinimumRole).toBe(authorizationModule.hasMinimumRole);
+    expect(hasSuperuserPrivileges).toBe(authorizationModule.hasSuperuserPrivileges);
+    expect(privilegeClaimsAreConsistent).toBe(authorizationModule.privilegeClaimsAreConsistent);
+    expect(ORDERED_ROLES).toBe(authorizationModule.ORDERED_ROLES);
+    expect(ORDERED_ROLES).toEqual(["superadmin", "admin", "writer", "reader", "user"]);
+  });
+
+  // The full matrix: every role against every floor, so `minimumRole` is proven
+  // to be the ordered comparison and not exact membership. A `superadmin` must
+  // clear every floor - the bug the hierarchy exists to prevent is an admin
+  // surface hidden from the one account that outranks it.
+  it.each(
+    ORDERED_ROLES.flatMap((role) =>
+      ORDERED_ROLES.map((floor) => ({
+        role,
+        floor,
+        granted: ORDERED_ROLES.indexOf(role) <= ORDERED_ROLES.indexOf(floor)
+      }))
+    )
+  )("renders $granted for role $role against minimumRole $floor", async ({ role, floor, granted }) => {
+    profileApi.getProfile.mockResolvedValue({ ...user, role, is_superuser: role === "superadmin" });
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <RequireRole minimumRole={floor} fallback={<b>denied</b>}><u>granted</u></RequireRole>;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user?.role).toBe(role));
+    expect(view.container.textContent).toBe(granted ? "granted" : "denied");
+    view.unmount();
+  });
+
+  it("matches the roles-array spelling of the same floor", async () => {
+    profileApi.getProfile.mockResolvedValue({ ...user, role: "admin" as const, is_superuser: false });
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return (
+        <>
+          <RequireRole minimumRole="writer" fallback={<b>denied-min</b>}><u>granted-min</u></RequireRole>
+          <RequireRole roles={["writer"]} fallback={<b>denied-array</b>}><u>granted-array</u></RequireRole>
+        </>
+      );
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user?.role).toBe("admin"));
+    expect(view.container.textContent).toBe("granted-mingranted-array");
+    view.unmount();
+  });
+
+  // The modes are a union, so a guard carrying both grants on either. The
+  // second case is the one that matters: a `superadmin` whose `is_superuser`
+  // disagrees fails the dual-evidence gate and is still admitted by the role
+  // floor, which is correct - `minimumRole` makes no claim about the flag.
+  it("grants on either mode when a guard carries both", async () => {
+    profileApi.getProfile.mockResolvedValue({ ...user, role: "reader" as const, is_superuser: false });
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <RequireRole superuser minimumRole="reader" fallback={<b>denied</b>}><u>granted</u></RequireRole>;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user?.role).toBe("reader"));
+    expect(view.container.textContent).toBe("granted");
+    view.unmount();
+  });
+
+  // Fail closed on every state that is not a satisfied mode: no mode at all,
+  // an unresolved session, and an anonymous one.
+  it("falls back for an unqualified guard, a loading session, and an anonymous session", async () => {
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return <RequireRole fallback={<b>denied</b>}><u>granted</u></RequireRole>;
+    }
+    const qualified = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user?.role).toBe("superadmin"));
+    expect(qualified.container.textContent).toBe("denied");
+    qualified.unmount();
+
+    function MinProbe() {
+      auth = useAuth();
+      return <RequireRole minimumRole="user" fallback={<b>denied</b>}><u>granted</u></RequireRole>;
+    }
+    const loading = render(<AuthProvider><MinProbe /></AuthProvider>);
+    expect(loading.container.textContent).toBe("denied");
+    await waitFor(() => expect(auth!.user?.role).toBe("superadmin"));
+    expect(loading.container.textContent).toBe("granted");
+    loading.unmount();
+
+    profileApi.getProfile.mockRejectedValue(new Error("anonymous"));
+    authApi.refreshToken.mockRejectedValue(new Error("anonymous"));
+    const anonymous = render(<AuthProvider><MinProbe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(auth!.user).toBeNull();
+    expect(anonymous.container.textContent).toBe("denied");
+    anonymous.unmount();
   });
 });
 

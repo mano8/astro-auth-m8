@@ -6,6 +6,41 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The major version tracks the supported `fa-auth-m8` **API contract**, not just
 this package's own surface: a backend contract repoint is always a major.
 
+## 2.1.0
+
+Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range
+`>=2.0.0 <3.0.0`.
+
+### Added
+
+- **`RequireRole minimumRole`**, an explicit minimum-role mode:
+  `minimumRole="admin"` renders when the signed-in role meets or exceeds
+  `admin` on the ordered hierarchy. It decides identically to
+  `roles={["admin"]}` — each array entry has been a floor since 2.0.0 — but
+  says what the backend dependency says instead of reading as exact membership,
+  so a consumer expressing a single floor no longer hand-enumerates a role
+  array. `roles` is unchanged and stays for guards that accept several
+  unrelated tiers; `superuser` remains the separate dual-evidence gate. A guard
+  may carry more than one mode and grants on the first that holds; one carrying
+  no mode grants nothing, as before.
+- **`hasMinimumRole`, `hasSuperuserPrivileges`, `privilegeClaimsAreConsistent`
+  and `ORDERED_ROLES` re-exported from `./react`**, as the same bindings the
+  `./authorization` subpath exports — not a second implementation. Gating
+  something that is not a subtree (a menu entry, a row action, a `disabled`
+  attribute) now reaches the comparison from the subpath the guard already
+  comes from.
+
+### Changed
+
+- `security-panel` gates its audit-log read with `minimumRole="admin"` rather
+  than `roles={["admin"]}`. Behaviour is identical; the copied file and the
+  `registry/r` output both change, so a consumer re-adding the block picks up
+  the new spelling.
+- `compatibility.test.ts` now pins the published `faAuthM8` package-metadata
+  block against the `compatibility.ts` constants, so the machine-readable half
+  of the contract claim cannot drift from the half the browser preflight
+  enforces.
+
 ## 2.0.0
 
 Aligns the plugin with the `fa-auth-m8@2.0` contract (service `2.0.0`,
