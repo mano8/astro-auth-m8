@@ -55,10 +55,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run build:registry",
     "build:registry": "node scripts/build-registry.mjs",
+    "verify:fleet-gates": "node scripts/verify-fleet-gates.mjs",
+    "verify:registry-consumer": "node scripts/verify-registry-consumer.mjs",
+    "verify:registry-drift": "node scripts/verify-registry-drift.mjs",
     "verify:starter-routes": "node scripts/verify-starter-routes.mjs",
+    "verify:tarball-install": "node scripts/verify-tarball-install.mjs",
     "test": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint .",
     "test:unit": "vitest run"
   },
   "dependencies": {
@@ -76,9 +80,10 @@
   "devDependencies": {
     "@astrojs/react": "^6.0.1",
     "@astrojs/starlight": "^0.41.3",
-    "@eslint/js": "^10.0.1",
     "@eslint-react/eslint-plugin": "^5.18.0",
+    "@eslint/js": "^10.0.1",
     "@tanstack/react-query": "5.101.1",
+    "@tanstack/react-table": "^8.21.3",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@typescript-eslint/eslint-plugin": "^8.65.0",

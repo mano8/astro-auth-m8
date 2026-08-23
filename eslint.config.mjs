@@ -13,12 +13,15 @@ export default [
       "fixtures/",
       "node_modules/",
       "registry/r/",
+      ".tmp/",
       ".astro/",
       ".vite/"
     ]
   },
   {
-    files: ["src/**/*.{ts,tsx}"],
+    // Registry skins are linted with the runtime: they are published source, and
+    // scoping ESLint to `src/**` left them unread by any gate (`C12`).
+    files: ["src/**/*.{ts,tsx}", "registry/blocks/**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

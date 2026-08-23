@@ -1,0 +1,61 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "fa-m8-auth",
+  "homepage": "https://github.com/mano8/astro-auth-m8",
+  "items": [
+    {
+      "name": "activity-bar-chart",
+      "type": "registry:component",
+      "title": "Activity Bar Chart",
+      "description": "shadcn chart preset (recharts) for fa-auth per-model added/updated activity."
+    },
+    {
+      "name": "dashboard-overview",
+      "type": "registry:component",
+      "title": "Account Dashboard Overview",
+      "description": "fa-auth activity dashboard (stat cards + chart) driven by the package's useDashboard hook. Requires @mano8/astro-auth-m8 installed."
+    },
+    {
+      "name": "account-dashboard",
+      "type": "registry:component",
+      "title": "Account Dashboard",
+      "description": "fa-auth account view whose first/landing tab is the activity dashboard; secondary tabs are wired by the consumer. Requires @mano8/astro-auth-m8 installed."
+    },
+    {
+      "name": "profile-panel",
+      "type": "registry:component",
+      "title": "Account Profile Panel",
+      "description": "fa-auth profile editor (metadata + password rotation) driven by the package's useAuth + useProfile hooks. Requires @mano8/astro-auth-m8 installed."
+    },
+    {
+      "name": "sessions-panel",
+      "type": "registry:component",
+      "title": "Account Sessions Panel",
+      "description": "fa-auth session details + activity summaries with superuser-only session revocation, driven by the package's useSessions + useDashboard hooks. Requires @mano8/astro-auth-m8 installed."
+    },
+    {
+      "name": "account-crud",
+      "type": "registry:component",
+      "title": "Account CRUD Helpers",
+      "description": "Shared skin helpers for the fa-auth account panels: a client-side controller for the canonical astro-ui-m8 data-table, a popup form dialog, a delete-confirmation alert, the fixed row-actions cell, and the bottom-right toast host."
+    },
+    {
+      "name": "api-keys-panel",
+      "type": "registry:component",
+      "title": "Account API Keys Panel",
+      "description": "fa-auth API token mint/revoke panel on the canonical data-table (page selector, orderable columns, column visibility), with popup create form, alert-dialog revoke confirm, and bottom-right toasts. Driven by the package's useApiKeys hook. Requires @mano8/astro-auth-m8 installed."
+    },
+    {
+      "name": "admin-users-panel",
+      "type": "registry:component",
+      "title": "Admin Users Panel",
+      "description": "fa-auth superuser-only user management on the canonical data-table (page selector, orderable columns, column visibility), with popup create/edit forms, alert-dialog delete confirm, and bottom-right toasts. Gated by the package's RequireRole and driven by useUsers. Requires @mano8/astro-auth-m8 installed."
+    },
+    {
+      "name": "security-panel",
+      "type": "registry:component",
+      "title": "Account Security Panel",
+      "description": "fa-auth admin-tier privileged-action audit log on the canonical data-table plus the two superuser-only retention purges, each behind a confirmation naming the retention floor. Gated by the package's RequireRole (role hierarchy for the log, dual evidence for the purges) and driven by useAuditLog + useSecurityPurges. Requires @mano8/astro-auth-m8 installed."
+    }
+  ]
+}
