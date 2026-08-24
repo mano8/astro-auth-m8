@@ -14,6 +14,20 @@ export interface Control<TValues extends FieldValues> {
   readonly __values?: TValues;
 }
 
+/**
+ * Mirrors the real `UseFormRegisterReturn`, whose handlers are deliberately
+ * element-agnostic: one `register()` call spreads onto `<input>`, `<select>` or
+ * `<textarea>`. Typing them per-element would fail a skin that is correct.
+ */
+export type ChangeHandler = (event: { target: unknown; type?: unknown }) => void;
+
+export interface UseFormRegisterReturn {
+  name: string;
+  onChange: ChangeHandler;
+  onBlur: ChangeHandler;
+  ref: (instance: unknown) => void;
+}
+
 export interface ControllerRenderProps<
   TValues extends FieldValues,
   TName extends FieldName<TValues>,
@@ -49,7 +63,7 @@ export interface UseFormReturn<TValues extends FieldValues> {
   control: Control<TValues>;
   formState: FormState<TValues>;
   handleSubmit: (onSubmit: SubmitHandler<TValues>) => React.FormEventHandler<HTMLFormElement>;
-  register: (name: FieldName<TValues>) => React.InputHTMLAttributes<HTMLInputElement>;
+  register: (name: FieldName<TValues>) => UseFormRegisterReturn;
   reset: (values?: DefaultValues<TValues>) => void;
   getValues: {
     (): TValues;

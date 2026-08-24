@@ -268,11 +268,32 @@ function gateTokenOnlyCss() {
         }
       });
   }
+  // The headless default UI styles itself without Tailwind (mode B), so it may
+  // carry `CSSProperties` constants — but a colour belongs in the token bridge
+  // wherever it is written, so the literal check follows it there.
+  for (const file of sourceFiles) {
+    if (!file.startsWith("src/runtime/react/") && !file.startsWith("registry/blocks/")) continue;
+    stripComments(sources.get(file))
+      .split("\n")
+      .forEach((line, index) => {
+        if (COLOUR_LITERAL.test(line)) {
+          fail(
+            "token-only-css",
+            `${file}:${index + 1}`,
+            "colour literal; resolve colour through a token, not a hard-coded value",
+          );
+        }
+      });
+  }
 }
 
 function gateNoInlineStyle() {
-  for (const file of sourceFiles) {
-    if (!file.startsWith("registry/blocks/") && !file.startsWith("src/runtime/react/")) continue;
+  // Scoped to the shadcn skins, the same way `no-duplicate-data-table` is: a
+  // skin styles through classes because that is the contract a consumer copies
+  // it into. `src/runtime/react/**` is the framework-neutral headless layer,
+  // which has no Tailwind to reach for — its colours are covered by
+  // `token-only-css` above rather than by banning the attribute outright.
+  for (const file of skinFiles) {
     sources
       .get(file)
       .split("\n")
