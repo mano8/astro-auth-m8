@@ -36,6 +36,12 @@ jobs:
         run: npm run verify:registry-consumer
       - name: Standalone minimal-host starter routes
         run: npm run verify:starter-routes
+      # The dev-only gallery renders every island root from source, so it is
+      # the gate that fails when a view's imports stop resolving. `A-C2` added
+      # it after finding the shared package's own gallery had been broken for
+      # months precisely because no job ran it.
+      - name: Build the /_preview gallery
+        run: npm run preview:build
       - run: npm pack --dry-run
       - name: Standalone install-from-tarball smoke
         run: npm run verify:tarball-install
