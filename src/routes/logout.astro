@@ -1,10 +1,10 @@
 ---
-import { AuthProvider } from "@mano8/astro-auth-m8/react";
+import { StarterLogoutPage } from "@mano8/astro-auth-m8/default-ui";
 import { logout } from "@mano8/astro-auth-m8/client";
 import AuthStyles from "./_AuthStyles.astro";
 ---
 <AuthStyles />
-<AuthProvider client:load config={{ apiBase: import.meta.env.PUBLIC_FA_AUTH_API_BASE }}>
+<StarterLogoutPage client:load config={{ apiBase: import.meta.env.PUBLIC_FA_AUTH_API_BASE }}>
   <form
     class="fa-auth-panel mx-auto flex w-full max-w-md flex-col gap-6 rounded-2xl border border-border/70 bg-card/95 p-6 text-card-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90"
     method="post"
@@ -21,7 +21,7 @@ import AuthStyles from "./_AuthStyles.astro";
       Sign out
     </button>
   </form>
-</AuthProvider>
+</StarterLogoutPage>
 <script>
   import { logout } from "@mano8/astro-auth-m8/client";
   document.getElementById("fa-auth-logout")?.addEventListener("click", async () => {
