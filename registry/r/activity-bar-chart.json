@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "activity-bar-chart",
+  "type": "registry:component",
+  "title": "Activity Bar Chart",
+  "description": "shadcn chart preset (recharts) for fa-auth per-model added/updated activity.",
+  "dependencies": [
+    "recharts"
+  ],
+  "registryDependencies": [
+    "chart"
+  ],
+  "files": [
+    {
+      "path": "registry/blocks/chart/activity-bar-chart.tsx",
+      "content": "\"use client\";\n\n// Pure-shadcn bar chart preset (recharts-backed) for fa-auth dashboard activity:\n// per-model `added` vs `updated` counts. Copied into the consumer via the\n// @fa-m8-auth registry; edit freely per app.\nimport { Bar, BarChart, CartesianGrid, XAxis, YAxis } from \"recharts\";\n\nimport {\n  type ChartConfig,\n  ChartContainer,\n  ChartLegend,\n  ChartLegendContent,\n  ChartTooltip,\n  ChartTooltipContent,\n} from \"@/components/ui/chart\";\n\nexport interface ActivityDatum {\n  model: string;\n  added: number;\n  updated: number;\n}\n\nexport interface ActivityBarChartProps {\n  data: ActivityDatum[];\n  addedLabel?: string;\n  updatedLabel?: string;\n  className?: string;\n}\n\nexport function ActivityBarChart({\n  data,\n  addedLabel = \"Added\",\n  updatedLabel = \"Updated\",\n  className,\n}: ActivityBarChartProps) {\n  const chartConfig = {\n    added: { label: addedLabel, color: \"var(--chart-1)\" },\n    updated: { label: updatedLabel, color: \"var(--chart-2)\" },\n  } satisfies ChartConfig;\n\n  return (\n    <ChartContainer config={chartConfig} className={className}>\n      <BarChart accessibilityLayer data={data}>\n        <CartesianGrid vertical={false} />\n        <XAxis\n          dataKey=\"model\"\n          tickLine={false}\n          tickMargin={10}\n          axisLine={false}\n        />\n        <YAxis tickLine={false} axisLine={false} allowDecimals={false} width={32} />\n        <ChartTooltip content={<ChartTooltipContent />} />\n        <ChartLegend content={<ChartLegendContent />} />\n        <Bar dataKey=\"added\" fill=\"var(--color-added)\" radius={4} />\n        <Bar dataKey=\"updated\" fill=\"var(--color-updated)\" radius={4} />\n      </BarChart>\n    </ChartContainer>\n  );\n}\n",
+      "type": "registry:component",
+      "target": "components/fa-auth/activity-bar-chart.tsx"
+    }
+  ]
+}

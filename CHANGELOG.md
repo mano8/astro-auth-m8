@@ -6,6 +6,32 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The major version tracks the supported `fa-auth-m8` **API contract**, not just
 this package's own surface: a backend contract repoint is always a major.
 
+## 2.2.0
+
+Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range
+`>=2.0.0 <3.0.0`.
+
+### Added
+
+- **`AuthErrorBoundary` from `./react`**, with a safe default fallback, custom
+  fallback and reporting hooks, retry support, and reset keys. Every starter
+  island root now mounts beneath this boundary so a render failure leaves a
+  usable recovery surface instead of a blank login, signup, callback, account,
+  or logout region.
+- **A dev-only `/_preview` gallery** for exercising every auth island against a
+  deterministic in-browser service stub. Run it with `npm run preview:dev`;
+  `npm run preview:build` typechecks and bundles the same gallery in CI.
+- **Standalone package-consumer gates** for generated registry skins and the
+  packed tarball, plus fleet-alignment and registry-drift checks in CI.
+
+### Changed
+
+- Raised the runtime dependency on `@mano8/astro-ui-m8` from `^1.4.2` to
+  `^1.5.0`, the published shared-UI release required by the registry gates.
+- Expanded linting to the maintained repository surface and kept development
+  dependencies inside the high-severity audit that protects the build and
+  signing environment.
+
 ## 2.1.0
 
 Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range

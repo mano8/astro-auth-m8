@@ -4,6 +4,7 @@
 export { AUTH_REVOCATION_EVENT, emitAuthRevocation, type AuthRevocationDetail } from "../authEvents.js";
 export * from "./AuthQueryProvider.js";
 export * from "./AuthProvider.js";
+export * from "./AuthErrorBoundary.js";
 export * from "./RequireAuth.js";
 export * from "./RequireRole.js";
 // The hierarchy primitives, re-exported alongside `RequireRole` so a consumer

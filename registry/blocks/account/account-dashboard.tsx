@@ -84,6 +84,10 @@ function AccountShell({
   signIn?: React.ReactNode;
 }) {
   const { user, loading, logout }: AuthContextValue = useAuth();
+  // Declared before the loading and signed-out early returns: this component
+  // renders those branches first and the signed-in branch afterwards, so a hook
+  // placed below them changes hook order between renders and React throws.
+  const [activeTab, setActiveTab] = React.useState<string>("dashboard");
 
   if (loading) {
     return (
@@ -114,7 +118,6 @@ function AccountShell({
         hasSuperuserPrivileges(user.role, user.is_superuser)) &&
       (!tab.minRole || hasMinimumRole(user.role, tab.minRole)),
   );
-  const [activeTab, setActiveTab] = React.useState<string>("dashboard");
   const navItems = [
     {
       id: "dashboard",
