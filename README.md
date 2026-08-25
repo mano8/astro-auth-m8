@@ -77,6 +77,28 @@ const { title, description } = describeApiError(error, "Update failed");
 
 `409` `last_superuser_required` is labelled (the raw token is never surfaced); `403` is titled by status (`Not permitted`) with the backend's own readable detail as the description, since several surfaces produce a `403` and the detail that distinguishes them is not a stable contract; `429` and `503` are distinguished (rate limited vs. an unknown outcome that must not be retried); `400` free-text detail (e.g. a purge's retention-floor rejection) is surfaced verbatim under a labelled heading rather than pattern-matched.
 
+### Island error boundaries
+
+Every starter island root is wrapped in `AuthErrorBoundary`, exported from
+`@mano8/astro-auth-m8/react`. Its default fallback deliberately hides the
+caught message so a token fragment, username, or API URL cannot leak onto a
+public auth page. Applications can replace the fallback, report the error, or
+reset the boundary when route-specific keys change:
+
+```tsx
+import { AuthErrorBoundary } from "@mano8/astro-auth-m8/react";
+
+<AuthErrorBoundary
+  onError={(error, info) => reportAuthViewError(error, info)}
+  resetKeys={[locale]}
+>
+  <AuthView />
+</AuthErrorBoundary>
+```
+
+The retry action resets the failed subtree; it does not automatically repeat a
+request whose outcome may be unknown.
+
 ## Admin API-key and security surfaces (fa-auth-m8 2.0.0)
 
 `@mano8/astro-auth-m8/api` and `@mano8/astro-auth-m8/hooks` wrap the five 2.0.0 admin routes:
@@ -112,6 +134,11 @@ A mounted `AuthProvider` listens for it and, when the id is the signed-in princi
 - `headless`: exports typed schemas, API wrappers, token handling, React provider/hooks, and route helpers without injecting pages.
 - `starter`: injects small default login, logout, callback, and account routes with `injectRoute()`.
 - `scaffold`: copies editable Astro/React/CSS files into a consumer app with `astro-auth-m8 scaffold --views --target src/auth`.
+
+For package development, `npm run preview:dev` serves a dev-only `/_preview`
+gallery backed by a deterministic browser stub. `npm run preview:build` runs
+the typecheck-and-bundle gate used by CI; the preview is a repository fixture
+and is not shipped as a consumer route.
 
 ```ts
 import { defineConfig } from "astro/config";
