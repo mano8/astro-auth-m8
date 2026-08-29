@@ -22,6 +22,17 @@
  * These are client-side display predicates. The backend remains the authority;
  * mirroring its rules here only stops the UI from showing privileged surfaces
  * the server would refuse.
+ *
+ * **This module is shared with the rest of the plugin fleet.** `./authorization`
+ * is the one subpath of this package a sibling business plugin may import: the
+ * fleet's `no-cross-plugin-import` gate (`C12`) exempts that exact specifier so
+ * `RBAC-06` — one role hierarchy across the fleet — is met by an import rather
+ * than by a copy each plugin has to pin with a test. The exemption is
+ * conditional on this file staying pure, and the `authorization-purity` gate in
+ * `scripts/verify-fleet-gates.mjs` enforces it in all four plugins: it walks
+ * this module's import closure and fails on React, on any bare dependency other
+ * than `zod`, or on any read of a runtime global. Keep it framework-neutral and
+ * effect-free — anything else here breaks every sibling plugin's build.
  */
 
 import { RoleTypeSchema, type RoleType } from "./schemas.js";

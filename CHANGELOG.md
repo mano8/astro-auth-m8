@@ -6,6 +6,27 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The major version tracks the supported `fa-auth-m8` **API contract**, not just
 this package's own surface: a backend contract repoint is always a major.
 
+## [Unreleased]
+
+### Changed
+
+- **`./authorization` is now the fleet's shared role hierarchy** (remediation
+  `W7.7`, decision 4). Nothing in the published surface changes: the module,
+  its four exports and their behaviour are exactly as `2.3.0` shipped them.
+  What changes is its standing. The fleet's `no-cross-plugin-import` gate
+  (`C12`, `scripts/verify-fleet-gates.mjs`, carried byte-identically by all
+  four plugins) now exempts this one exact specifier, so a sibling plugin can
+  import the hierarchy instead of re-implementing it and pinning the copy with
+  an agreement test — which is how `RBAC-06`, one hierarchy, becomes literally
+  true again. Every other subpath of this package stays refused.
+  A new `authorization-purity` gate makes the exemption conditional rather than
+  a blanket trust: it resolves what this package publishes for
+  `./authorization`, walks its import closure, and fails on React, on any bare
+  dependency other than `zod`, or on any read of a runtime global. It runs here
+  against this repository's own build, so keeping the module framework-neutral
+  and effect-free is now a gated obligation of this repository. Repository
+  tooling only — `scripts/` is not published, and no consumer needs to reinstall.
+
 ## 2.3.0
 
 Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range

@@ -38,6 +38,21 @@ is the foundation authentication plugin for `fa-ui-m8` and other M8 Astro apps.
 - Export public modules only through explicit `package.json` subpaths.
 - Preserve the adapter and provider surface as a stable fleet boundary; breaking
   changes have fleet-wide consequences.
+- `./authorization` is the fleet's one role hierarchy, and the only subpath of
+  this package another business plugin may import. It is the TypeScript mirror
+  of `auth_sdk_m8/authorization.py`: `ORDERED_ROLES`, `hasMinimumRole`,
+  `privilegeClaimsAreConsistent`, `hasSuperuserPrivileges` and nothing else.
+  The fleet's `no-cross-plugin-import` gate (`C12`,
+  `scripts/verify-fleet-gates.mjs`) exempts that one exact specifier so
+  `RBAC-06` — one hierarchy — can be met by an import rather than by a copy;
+  every other subpath stays refused, so a sibling plugin never reaches this
+  package's runtime, React surface or integration through it. The exemption is
+  conditional and gated: `authorization-purity`, carried byte-identically by
+  all four plugins, walks this module's import closure and fails on React, on
+  any bare dependency but `zod`, or on any runtime global. **Keeping that
+  module pure and framework-neutral is therefore a fleet obligation of this
+  repository**, not a local style preference — a `react` import or a `window`
+  read inside its closure breaks every sibling's build, by design.
 
 ## Package version alignment
 
