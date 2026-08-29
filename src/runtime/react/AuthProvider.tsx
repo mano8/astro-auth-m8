@@ -1,9 +1,12 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { configureAuth, type AuthRuntimeConfig } from "../config.js";
 import { login as apiLogin, logout as apiLogout, refreshToken } from "../api/auth.js";
 import { getProfile } from "../api/profile.js";
 import { AUTH_REVOCATION_EVENT, type AuthRevocationDetail } from "../authEvents.js";
+import { authKeys } from "../queryKeys.js";
 import type { UserPublic } from "../schemas.js";
+import { isSessionKnownAbsent, markSessionAbsent, markSessionPresent } from "../sessionHint.js";
 import { runRefresh, setToken } from "../tokenStore.js";
 import { AuthQueryProvider } from "./AuthQueryProvider.js";
 
@@ -35,6 +38,11 @@ function emitAuthSession(user: UserPublic | null) {
 function bootstrapSession(): Promise<UserPublic | null> {
   const now = Date.now();
   if (bootstrapFailureUntil > now) return Promise.resolve(null);
+  // A prior bootstrap already confirmed this browser has no session: skip
+  // the refresh call outright rather than making another one fa-auth-m8 has
+  // no cookie to answer. See sessionHint.ts for why this is a negative-only
+  // hint and not a read of the actual (HttpOnly) cookie.
+  if (isSessionKnownAbsent()) return Promise.resolve(null);
 
   if (!bootstrapSessionPromise) {
     // Routed through the shared `runRefresh` guard so a page mounting this
@@ -51,11 +59,13 @@ function bootstrapSession(): Promise<UserPublic | null> {
       })
       .then((profile) => {
         bootstrapFailureUntil = 0;
+        markSessionPresent();
         emitAuthSession(profile);
         return profile;
       })
       .catch((err) => {
         bootstrapFailureUntil = Date.now() + BOOTSTRAP_FAILURE_COOLDOWN_MS;
+        markSessionAbsent();
         throw err;
       })
       .finally(() => {
@@ -69,14 +79,38 @@ function bootstrapSession(): Promise<UserPublic | null> {
 export function AuthProvider({ children, config, bootstrap = true }: { children: ReactNode; config?: Partial<AuthRuntimeConfig>; bootstrap?: boolean }) {
   if (config) configureAuth(config);
 
+  return (
+    <AuthQueryProvider>
+      <AuthProviderInner bootstrap={bootstrap}>{children}</AuthProviderInner>
+    </AuthQueryProvider>
+  );
+}
+
+function AuthProviderInner({ children, bootstrap }: { children: ReactNode; bootstrap: boolean }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(bootstrap);
   const [error, setError] = useState<unknown>(null);
 
+  // The identity lookup a screen's own `useProfile()` runs is a separate
+  // react-query cache entry from this state; without seeding it here, a
+  // screen mounting both ends up making two `me` requests for the one
+  // answer this provider already has. Every place that learns the true
+  // profile - bootstrap, login, reload, the cross-provider session event,
+  // revocation - routes through this so `useProfile()` reads it as already
+  // fresh instead of refetching.
+  const applyUser = useCallback(
+    (profile: UserPublic | null) => {
+      setUser(profile);
+      queryClient.setQueryData(authKeys.profile(), profile);
+    },
+    [queryClient]
+  );
+
   useEffect(() => {
     const onSession = (event: Event) => {
       const nextUser = (event as AuthSessionEvent).detail?.user ?? null;
-      setUser(nextUser);
+      applyUser(nextUser);
       setError(null);
       setLoading(false);
     };
@@ -85,20 +119,20 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
     return () => {
       window.removeEventListener(AUTH_SESSION_EVENT, onSession);
     };
-  }, []);
+  }, [applyUser]);
 
   const reload = useCallback(async () => {
     try {
       const profile = await getProfile();
-      setUser(profile);
+      applyUser(profile);
       setError(null);
       return profile;
     } catch (err) {
-      setUser(null);
+      applyUser(null);
       setError(err);
       return null;
     }
-  }, []);
+  }, [applyUser]);
 
   useEffect(() => {
     if (!bootstrap) return;
@@ -107,13 +141,13 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
     bootstrapSession()
       .then((profile) => {
         if (!cancelled) {
-          setUser(profile);
+          applyUser(profile);
           setError(null);
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setUser(null);
+          applyUser(null);
           setError(err);
         }
       })
@@ -123,7 +157,7 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
     return () => {
       cancelled = true;
     };
-  }, [bootstrap, reload]);
+  }, [bootstrap, applyUser]);
 
   // AA-11: `revocation_enqueued: true` means the backend has already revoked the
   // target principal's sessions and is propagating an authorization-generation
@@ -152,24 +186,22 @@ export function AuthProvider({ children, config, bootstrap = true }: { children:
     await apiLogin(username, password);
     const profile = await getProfile();
     bootstrapFailureUntil = 0;
-    setUser(profile);
+    markSessionPresent();
+    applyUser(profile);
     setError(null);
     emitAuthSession(profile);
     return profile;
-  }, []);
+  }, [applyUser]);
 
   const logout = useCallback(async () => {
     await apiLogout();
-    setUser(null);
+    markSessionAbsent();
+    applyUser(null);
     emitAuthSession(null);
-  }, []);
+  }, [applyUser]);
 
   const value = useMemo<AuthContextValue>(() => ({ user, loading, error, login, logout, reload }), [user, loading, error, login, logout, reload]);
-  return (
-    <AuthQueryProvider>
-      <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-    </AuthQueryProvider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

@@ -115,6 +115,7 @@ function QueryClientProbe({ expose }: { expose: (client: QueryClient) => void })
 beforeEach(() => {
   resetAuthConfig();
   vi.clearAllMocks();
+  localStorage.clear();
   authApi.login.mockResolvedValue({ access_token: "token", token_type: "bearer" });
   authApi.logout.mockResolvedValue({ message: "bye" });
   authApi.refreshToken.mockResolvedValue({ access_token: "token", token_type: "bearer" });
@@ -403,6 +404,59 @@ describe("AuthProvider and guards", () => {
     const cleanup = render(<AuthProvider bootstrap={false}><Probe /></AuthProvider>);
     await act(async () => { await auth!.login("ada@example.com", "password"); });
     cleanup.unmount();
+  });
+
+  it("skips the bootstrap refresh once a session is confirmed absent, and resumes it after login", async () => {
+    // W3.2: a logout (or, equally, a failed bootstrap refresh) records that
+    // this browser has no session, so the next page load's bootstrap makes
+    // no refresh call at all rather than one fa-auth-m8 has no cookie to
+    // answer - not merely a shorter cooldown, an outright skip.
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    const loggedIn = render(<AuthProvider bootstrap={false}><Probe /></AuthProvider>);
+    await act(async () => { await auth!.login("ada@example.com", "password"); });
+    await act(async () => { await auth!.logout(); });
+    loggedIn.unmount();
+
+    authApi.refreshToken.mockClear();
+    const anonymous = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(authApi.refreshToken).not.toHaveBeenCalled();
+    expect(auth!.user).toBeNull();
+    anonymous.unmount();
+
+    // A fresh login clears the hint, so the very next mount's bootstrap goes
+    // back to attempting the refresh normally.
+    await act(async () => { await auth!.login("ada@example.com", "password"); });
+    authApi.refreshToken.mockClear();
+    const returning = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user?.email).toBe("ada@example.com"));
+    expect(authApi.refreshToken).toHaveBeenCalledTimes(1);
+    returning.unmount();
+  });
+
+  it("shares the bootstrap's identity lookup with a screen's later useProfile mount", async () => {
+    // W3.2: a screen using both `useAuth()` and its own `useProfile()` must
+    // not double the identity call - the provider seeds the shared
+    // react-query cache with the profile it already fetched.
+    let auth: ReturnType<typeof useAuth> | undefined;
+    let profileHook: ReturnType<typeof useProfile> | undefined;
+    function ProfileProbe() {
+      profileHook = useProfile();
+      return null;
+    }
+    function Screen() {
+      auth = useAuth();
+      return auth.loading ? null : <ProfileProbe />;
+    }
+    const view = render(<AuthProvider><Screen /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    await waitFor(() => expect(profileHook?.profile?.email).toBe("ada@example.com"));
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+    view.unmount();
   });
 
   it("enters a failure cooldown after a failed bootstrap, then skips retry until it lapses", async () => {
