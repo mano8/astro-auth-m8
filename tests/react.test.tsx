@@ -35,6 +35,7 @@ import { useSessions } from "../src/runtime/hooks/useSessions.js";
 import { useUsers } from "../src/runtime/hooks/useUsers.js";
 import { authKeys } from "../src/runtime/queryKeys.js";
 import { getAuthConfig, resetAuthConfig } from "../src/runtime/config.js";
+import { runRefresh } from "../src/runtime/tokenStore.js";
 
 const user = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -350,6 +351,36 @@ describe("AuthProvider and guards", () => {
     expect(authApi.refreshToken).toHaveBeenCalledTimes(1);
     expect(authA!.user?.email).toBe("ada@example.com");
     expect(authB!.user?.email).toBe("ada@example.com");
+    view.unmount();
+  });
+
+  it("coordinates the bootstrap refresh with client.ts's own refresh guard over one expired token", async () => {
+    // W3.1: the bootstrap call and client.ts's 401-triggered refresh (both
+    // exercising `runRefresh` in tokenStore.ts) must resolve to a single
+    // in-flight rotation, not two independent ones racing the same token.
+    let resolveRefresh: (token: string) => void = () => {};
+    authApi.refreshToken.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveRefresh = (token) => resolve({ access_token: token, token_type: "bearer" }); })
+    );
+
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+
+    // A second, concurrent caller of the same guard - standing in for
+    // client.ts's own 401 path - must piggyback on the bootstrap's in-flight
+    // rotation rather than starting a second one.
+    const concurrentRefresh = runRefresh(() => { throw new Error("must not run a second refresher while one is in flight"); });
+
+    await act(async () => { resolveRefresh("rotated-token"); });
+    await waitFor(() => expect(auth!.loading).toBe(false));
+
+    expect(authApi.refreshToken).toHaveBeenCalledTimes(1);
+    await expect(concurrentRefresh).resolves.toBe("rotated-token");
+    expect(auth!.user?.email).toBe("ada@example.com");
     view.unmount();
   });
 

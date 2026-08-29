@@ -4,6 +4,7 @@ import { login as apiLogin, logout as apiLogout, refreshToken } from "../api/aut
 import { getProfile } from "../api/profile.js";
 import { AUTH_REVOCATION_EVENT, type AuthRevocationDetail } from "../authEvents.js";
 import type { UserPublic } from "../schemas.js";
+import { runRefresh, setToken } from "../tokenStore.js";
 import { AuthQueryProvider } from "./AuthQueryProvider.js";
 
 export type AuthContextValue = {
@@ -36,8 +37,18 @@ function bootstrapSession(): Promise<UserPublic | null> {
   if (bootstrapFailureUntil > now) return Promise.resolve(null);
 
   if (!bootstrapSessionPromise) {
-    bootstrapSessionPromise = refreshToken()
-      .then(() => getProfile())
+    // Routed through the shared `runRefresh` guard so a page mounting this
+    // bootstrap alongside client.ts's own 401-triggered refresh (over one
+    // expired token) issues at most one rotation, not two: whichever call
+    // reaches `runRefresh` first performs the request, the other piggybacks
+    // on its result. `refreshToken()` keeps its own single-flight guard for
+    // callers that use it directly; nesting it under `runRefresh` here only
+    // adds the cross-path coordination `runRefresh` exists for.
+    bootstrapSessionPromise = runRefresh(() => refreshToken().then((token) => token.access_token))
+      .then((accessToken) => {
+        setToken(accessToken);
+        return getProfile();
+      })
       .then((profile) => {
         bootstrapFailureUntil = 0;
         emitAuthSession(profile);
