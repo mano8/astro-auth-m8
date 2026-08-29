@@ -4,6 +4,7 @@ import { configureAuth, type AuthRuntimeConfig } from "../config.js";
 import { login as apiLogin, logout as apiLogout, refreshToken } from "../api/auth.js";
 import { getProfile } from "../api/profile.js";
 import { AUTH_REVOCATION_EVENT, type AuthRevocationDetail } from "../authEvents.js";
+import { ApiError } from "../errors.js";
 import { authKeys } from "../queryKeys.js";
 import type { UserPublic } from "../schemas.js";
 import { isSessionKnownAbsent, markSessionAbsent, markSessionPresent } from "../sessionHint.js";
@@ -65,7 +66,14 @@ function bootstrapSession(): Promise<UserPublic | null> {
       })
       .catch((err) => {
         bootstrapFailureUntil = Date.now() + BOOTSTRAP_FAILURE_COOLDOWN_MS;
-        markSessionAbsent();
+        // Only a 401 proves there is no session. A 500, a timeout or an
+        // offline load says nothing about the cookie, and the hint has no
+        // expiry - recording "no session" from one of those would make every
+        // later load skip the refresh and leave a validly signed-in user
+        // looking signed out until they logged in by hand. Those keep only
+        // the short `bootstrapFailureUntil` cooldown above, which lapses and
+        // retries on its own, exactly as before this hint existed.
+        if (err instanceof ApiError && err.status === 401) markSessionAbsent();
         throw err;
       })
       .finally(() => {
@@ -183,10 +191,11 @@ function AuthProviderInner({ children, bootstrap }: { children: ReactNode; boots
   }, [reload, user?.id]);
 
   const login = useCallback(async (username: string, password: string) => {
+    // `apiLogin` / `apiLogout` own the session hint (see sessionHint.ts), so
+    // it is deliberately not written again here.
     await apiLogin(username, password);
     const profile = await getProfile();
     bootstrapFailureUntil = 0;
-    markSessionPresent();
     applyUser(profile);
     setError(null);
     emitAuthSession(profile);
@@ -195,7 +204,6 @@ function AuthProviderInner({ children, bootstrap }: { children: ReactNode; boots
 
   const logout = useCallback(async () => {
     await apiLogout();
-    markSessionAbsent();
     applyUser(null);
     emitAuthSession(null);
   }, [applyUser]);
