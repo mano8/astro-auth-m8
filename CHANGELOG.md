@@ -6,6 +6,76 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The major version tracks the supported `fa-auth-m8` **API contract**, not just
 this package's own surface: a backend contract repoint is always a major.
 
+## 2.3.0
+
+Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range
+`>=2.0.0 <3.0.0`. A consumer already on `^2.2.0` resolves this release without
+a manifest change; the fleet raised its floor to `^2.3.0` anyway, because the
+refresh coordination below is behaviour its consumers depend on rather than an
+optimisation they can afford to miss.
+
+### Fixed
+
+- **The two refresh paths are coordinated** (remediation `W3.1`).
+  `AuthProvider`'s bootstrap called `refreshToken()` directly, bypassing the
+  `runRefresh` single-flight guard in `tokenStore.ts` that `client.ts`'s own
+  `401`-triggered refresh uses. Two independent guards over one *rotating*
+  token let a page mounting both paths against one expired token issue two
+  rotations — which `fa-auth-m8` correctly reads as token reuse and answers by
+  revoking every session for that account. `bootstrapSession()` now goes
+  through `runRefresh`, so whichever path reaches it first performs the
+  request and the other piggybacks on its resolved token. The existing
+  `bootstrapFailureUntil` cooldown is untouched; it is a separate concern
+  layered on top.
+- **A transient failure no longer poisons the session hint.** The bootstrap
+  catch recorded "no session" on *any* error, and the hint has no expiry, so a
+  single `500` or one offline load made every later page load skip its refresh
+  and left a validly signed-in user looking signed out until they signed in by
+  hand. Only a `401` records the negative now; every other failure keeps the
+  retryable cooldown, which lapses and recovers on its own.
+- **A session established outside `AuthProvider.login` clears the hint.** The
+  plugin's own `CallbackView` — and, more to the point, `fa-ui-m8`'s
+  `useGoogleLogin`, which calls `exchangeGoogleCode` + `setToken` directly and
+  then hard-navigates — never reached the provider's `login`, so a Google
+  sign-in after any earlier `401` landed on a page that skipped its bootstrap
+  and rendered as signed out. Rather than patch each UI, the hint now lives
+  beside `setToken`/`clearToken` at the points that actually establish or
+  destroy a session: login, logout, an honoured `refreshToken` (the only auth
+  call the sibling plugins make, through `installFaAuthBrowserAdapter`), a
+  completed OAuth exchange, and `client.ts`'s `401`-triggered rotation. Every
+  consumer is covered with no host change.
+- **Every Web Storage access is guarded.** These are core sign-in paths, so an
+  environment with no `localStorage` — or one refusing access to it — must lose
+  the optimisation and never the sign-in.
+
+### Added
+
+- **A negative-only session hint** (`src/runtime/sessionHint.ts`, remediation
+  `W3.2`). The provider's bootstrap called `refreshToken()` unconditionally on
+  every page load, including for a browser with no session at all.
+  `fa-auth-m8`'s `refresh_token` cookie is `HttpOnly`, so this runtime cannot
+  read it to find out, and `fa-auth-m8` behaviour changes were out of scope —
+  hence a client-owned substitute that only ever records the *negative*. It is
+  cleared by default and on a successful login or bootstrap, and set only once
+  a bootstrap refresh has actually been refused, or on logout.
+  `bootstrapSession()` then skips the refresh call outright, with no network
+  request. An unset hint still always attempts the refresh exactly as before,
+  so a browser carrying a still-valid cookie from before this release is never
+  signed out on a guess. **This adds one `localStorage` key**, which is why
+  this release is a minor rather than a patch.
+
+### Changed
+
+- **`AuthProvider` is split into an outer component and `AuthProviderInner`**,
+  the inner one rendered inside `AuthQueryProvider` so it can reach
+  `useQueryClient()`. A new `applyUser` callback replaces every direct
+  `setUser` call and additionally seeds
+  `queryClient.setQueryData(authKeys.profile(), profile)`, so a screen's own
+  `useProfile()` reads the provider's already-resolved profile from cache
+  instead of firing a second identity request for one answer.
+- Internal only: the tarball smoke test resolves the npm CLI on POSIX, and the
+  registry command fixture is aligned with `@mano8/astro-ui-m8` `1.5.0`.
+
 ## 2.2.0
 
 Additive only; the supported backend contract stays `fa-auth-m8@2.0`, range

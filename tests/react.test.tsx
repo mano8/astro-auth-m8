@@ -35,6 +35,8 @@ import { useSessions } from "../src/runtime/hooks/useSessions.js";
 import { useUsers } from "../src/runtime/hooks/useUsers.js";
 import { authKeys } from "../src/runtime/queryKeys.js";
 import { getAuthConfig, resetAuthConfig } from "../src/runtime/config.js";
+import { ApiError, UnauthenticatedError } from "../src/runtime/errors.js";
+import { runRefresh } from "../src/runtime/tokenStore.js";
 
 const user = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -114,6 +116,7 @@ function QueryClientProbe({ expose }: { expose: (client: QueryClient) => void })
 beforeEach(() => {
   resetAuthConfig();
   vi.clearAllMocks();
+  localStorage.clear();
   authApi.login.mockResolvedValue({ access_token: "token", token_type: "bearer" });
   authApi.logout.mockResolvedValue({ message: "bye" });
   authApi.refreshToken.mockResolvedValue({ access_token: "token", token_type: "bearer" });
@@ -353,6 +356,36 @@ describe("AuthProvider and guards", () => {
     view.unmount();
   });
 
+  it("coordinates the bootstrap refresh with client.ts's own refresh guard over one expired token", async () => {
+    // W3.1: the bootstrap call and client.ts's 401-triggered refresh (both
+    // exercising `runRefresh` in tokenStore.ts) must resolve to a single
+    // in-flight rotation, not two independent ones racing the same token.
+    let resolveRefresh: (token: string) => void = () => {};
+    authApi.refreshToken.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveRefresh = (token) => resolve({ access_token: token, token_type: "bearer" }); })
+    );
+
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    const view = render(<AuthProvider><Probe /></AuthProvider>);
+
+    // A second, concurrent caller of the same guard - standing in for
+    // client.ts's own 401 path - must piggyback on the bootstrap's in-flight
+    // rotation rather than starting a second one.
+    const concurrentRefresh = runRefresh(() => { throw new Error("must not run a second refresher while one is in flight"); });
+
+    await act(async () => { resolveRefresh("rotated-token"); });
+    await waitFor(() => expect(auth!.loading).toBe(false));
+
+    expect(authApi.refreshToken).toHaveBeenCalledTimes(1);
+    await expect(concurrentRefresh).resolves.toBe("rotated-token");
+    expect(auth!.user?.email).toBe("ada@example.com");
+    view.unmount();
+  });
+
   it("skips state updates for a bootstrap outcome that lands after unmount", async () => {
     let rejectRefresh: (err: unknown) => void = () => {};
     authApi.refreshToken.mockImplementationOnce(() => new Promise((_, reject) => { rejectRefresh = reject; }));
@@ -372,6 +405,99 @@ describe("AuthProvider and guards", () => {
     const cleanup = render(<AuthProvider bootstrap={false}><Probe /></AuthProvider>);
     await act(async () => { await auth!.login("ada@example.com", "password"); });
     cleanup.unmount();
+  });
+
+  it("skips the bootstrap refresh once a session is confirmed absent, and resumes it after login", async () => {
+    // W3.2: once this browser is known to have no session, the next page
+    // load's bootstrap makes no refresh call at all rather than one
+    // fa-auth-m8 has no cookie to answer - not merely a shorter cooldown, an
+    // outright skip. The hint is written by the API wrappers (`logout`, and
+    // the 401 case below), which are mocked in this file, so it is set
+    // directly here: what is under test is the provider's reaction to it.
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    localStorage.setItem("fa-auth-m8:no-session", "1");
+
+    authApi.refreshToken.mockClear();
+    const anonymous = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(authApi.refreshToken).not.toHaveBeenCalled();
+    expect(auth!.user).toBeNull();
+    anonymous.unmount();
+
+    // Once a session is established the hint is cleared (by `login` /
+    // `exchangeGoogleCode` / a honoured `refreshToken` - see
+    // `tests/api.test.ts`), and the very next mount's bootstrap goes back to
+    // attempting the refresh normally.
+    localStorage.removeItem("fa-auth-m8:no-session");
+    authApi.refreshToken.mockClear();
+    const returning = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.user?.email).toBe("ada@example.com"));
+    expect(authApi.refreshToken).toHaveBeenCalledTimes(1);
+    returning.unmount();
+  });
+
+  it("records no session from a 401 only, never from a transient bootstrap failure", async () => {
+    // W3.2 safety: the hint has no expiry, so recording it from a 500 or an
+    // offline load would leave a validly signed-in browser skipping its
+    // refresh on every later load. Only a 401 proves the session is gone;
+    // everything else keeps the short retryable cooldown it always had.
+    let auth: ReturnType<typeof useAuth> | undefined;
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+
+    // A failed bootstrap also starts the module-level retry cooldown, which
+    // would make the next mount return early without ever reaching the
+    // refresh. A successful login is what clears it, so each case below is
+    // followed by one - that also leaves the hint cleared, which is the state
+    // each case needs to start from.
+    const resetBootstrapCooldown = async () => {
+      const view = render(<AuthProvider bootstrap={false}><Probe /></AuthProvider>);
+      await act(async () => { await auth!.login("ada@example.com", "password"); });
+      view.unmount();
+    };
+
+    authApi.refreshToken.mockRejectedValueOnce(new ApiError(500, "auth service is down"));
+    const outage = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    expect(auth!.user).toBeNull();
+    outage.unmount();
+    expect(localStorage.getItem("fa-auth-m8:no-session")).toBeNull();
+    await resetBootstrapCooldown();
+
+    // A genuine 401 does record it.
+    authApi.refreshToken.mockRejectedValueOnce(new UnauthenticatedError());
+    const refused = render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    refused.unmount();
+    expect(localStorage.getItem("fa-auth-m8:no-session")).toBe("1");
+    await resetBootstrapCooldown();
+  });
+
+  it("shares the bootstrap's identity lookup with a screen's later useProfile mount", async () => {
+    // W3.2: a screen using both `useAuth()` and its own `useProfile()` must
+    // not double the identity call - the provider seeds the shared
+    // react-query cache with the profile it already fetched.
+    let auth: ReturnType<typeof useAuth> | undefined;
+    let profileHook: ReturnType<typeof useProfile> | undefined;
+    function ProfileProbe() {
+      profileHook = useProfile();
+      return null;
+    }
+    function Screen() {
+      auth = useAuth();
+      return auth.loading ? null : <ProfileProbe />;
+    }
+    const view = render(<AuthProvider><Screen /></AuthProvider>);
+    await waitFor(() => expect(auth!.loading).toBe(false));
+    await waitFor(() => expect(profileHook?.profile?.email).toBe("ada@example.com"));
+    expect(profileApi.getProfile).toHaveBeenCalledTimes(1);
+    view.unmount();
   });
 
   it("enters a failure cooldown after a failed bootstrap, then skips retry until it lapses", async () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const requestMock = vi.hoisted(() => vi.fn());
 
@@ -59,6 +59,66 @@ describe("auth API", () => {
     await expect(second).resolves.toMatchObject({ access_token: "shared" });
     expect(setToken).toHaveBeenCalledTimes(1);
     expect(setToken).toHaveBeenCalledWith("shared");
+  });
+});
+
+// W3.2: the session hint is written beside `setToken`/`clearToken`, at the
+// points that actually establish or destroy a session, rather than in any one
+// UI. That is what makes it correct for a consumer with its own sign-in
+// screens built on these wrappers (fa-ui-m8's Google callback is exactly
+// that) and for a sibling plugin whose only auth call is a refresh through
+// `installFaAuthBrowserAdapter`.
+describe("session hint at the API boundary", () => {
+  const HINT_KEY = "fa-auth-m8:no-session";
+  let store: Map<string, string>;
+
+  beforeEach(() => {
+    store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      setItem: (k: string, v: string) => store.set(k, v),
+      getItem: (k: string) => store.get(k) ?? null,
+      removeItem: (k: string) => store.delete(k)
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("clears the hint on login and records it on logout", async () => {
+    store.set(HINT_KEY, "1");
+    await auth.login("a@example.com", "pw");
+    expect(store.get(HINT_KEY)).toBeUndefined();
+
+    await auth.logout();
+    expect(store.get(HINT_KEY)).toBe("1");
+  });
+
+  it("clears the hint on a refresh the service honoured", async () => {
+    store.set(HINT_KEY, "1");
+    await auth.refreshToken();
+    expect(store.get(HINT_KEY)).toBeUndefined();
+  });
+
+  it("clears the hint on a completed OAuth exchange", async () => {
+    // The gap this closes: a host that completes the exchange with its own UI
+    // and hard-navigates never reaches `AuthProvider.login`, so without this
+    // the destination page would skip its bootstrap refresh and render a
+    // freshly signed-in user as signed out.
+    store.set(HINT_KEY, "1");
+    await oauth.exchangeGoogleCode({ code: "code", code_verifier: "verifier" });
+    expect(store.get(HINT_KEY)).toBeUndefined();
+  });
+
+  it("leaves the hint alone when the call fails", async () => {
+    store.set(HINT_KEY, "1");
+    requestMock.mockRejectedValueOnce(new Error("network down"));
+    await expect(oauth.exchangeGoogleCode({ code: "code", code_verifier: "v" })).rejects.toThrow("network down");
+    expect(store.get(HINT_KEY)).toBe("1");
+
+    requestMock.mockRejectedValueOnce(new Error("network down"));
+    await expect(auth.login("a@example.com", "pw")).rejects.toThrow("network down");
+    expect(store.get(HINT_KEY)).toBe("1");
   });
 });
 

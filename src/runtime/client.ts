@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getAuthConfig } from "./config.js";
 import { ApiError, normalizeFastApiError, UnauthenticatedError } from "./errors.js";
+import { markSessionPresent } from "./sessionHint.js";
 import { getToken, runRefresh, setToken } from "./tokenStore.js";
 import { TokenSchema } from "./schemas.js";
 
@@ -55,6 +56,13 @@ async function refreshAccessToken(): Promise<string | null> {
   });
   if (!response.ok) return null;
   const token = TokenSchema.parse(await response.json());
+  // A rotation the service honoured proves the cookie is still good, so a
+  // stale "no session" hint must not survive it - otherwise a tab that
+  // refreshed successfully here would still skip its bootstrap on the next
+  // page load. Only the success path: this returns `null` for *any* non-ok
+  // response, so it cannot tell a 401 from a 500 and must never record the
+  // negative. See sessionHint.ts.
+  markSessionPresent();
   return token.access_token;
 }
 
