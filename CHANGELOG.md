@@ -8,6 +8,29 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+## 2.4.1
+
+No behaviour or public API changes; the supported backend contract stays
+`fa-auth-m8@2.0`, range `>=2.0.0 <3.0.0`. Aligns shared devDependencies with
+`astro-ui-m8` and brings each to the newest version compatible with the rest
+of the toolchain.
+
+### Changed
+
+- Bumped shared dev tooling: `@astrojs/react`, `@astrojs/starlight`,
+  `@eslint-react/eslint-plugin`, `@tanstack/react-query` (also widened from an
+  exact `5.101.1` pin to `^5.102.8` in `peerDependencies`/`devDependencies`,
+  matching `astro-ui-m8`'s range style), `@tanstack/react-table` (`^8.21.3`,
+  closing the drift against `astro-ui-m8`), `@types/node`, `@types/react`,
+  `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`,
+  `@vitest/coverage-v8`, `astro`, `eslint`, `globals`, `jsdom`, `react`,
+  `react-dom`, `vitest`, and the `esbuild` override.
+- `typescript` stays at `^5.9.3`: the latest `@typescript-eslint/parser`
+  declares a peer ceiling of `<6.1.0` and there is no stable 6.x release yet.
+- `@tanstack/react-table` stays on the newest 8.x rather than 9.x: v9 changed
+  its generic type system and breaks `astro-ui-m8`'s shared data-table block;
+  migrating is deferred rather than folded into this bump.
+
 ## 2.4.0
 
 No code behaviour changes; the supported backend contract stays
