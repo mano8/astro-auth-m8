@@ -8,6 +8,18 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+## 2.4.0
+
+No code behaviour changes; the supported backend contract stays
+`fa-auth-m8@2.0`, range `>=2.0.0 <3.0.0`. This release exists to give the
+fleet a published version to pin against, because what moves here is a
+**commitment**, not an implementation: `./authorization` stops being an
+internal module that siblings happen to be able to reach and becomes a
+supported cross-plugin import surface, with a gate holding it to the purity
+that promise depends on. A consumer that only reinstalls gets byte-identical
+runtime behaviour — the point of the bump is that `^2.4.0` is now the range
+that *means* "this package guarantees the shared hierarchy".
+
 ### Changed
 
 - **`./authorization` is now the fleet's shared role hierarchy** (remediation
@@ -24,8 +36,9 @@ this package's own surface: a backend contract repoint is always a major.
   `./authorization`, walks its import closure, and fails on React, on any bare
   dependency other than `zod`, or on any read of a runtime global. It runs here
   against this repository's own build, so keeping the module framework-neutral
-  and effect-free is now a gated obligation of this repository. Repository
-  tooling only — `scripts/` is not published, and no consumer needs to reinstall.
+  and effect-free is now a gated obligation of this repository — recorded in
+  `REPOSITORY_CONTEXT.md` and in the module's own header, so it survives the
+  next person who edits it.
 
 ## 2.3.0
 
