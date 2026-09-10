@@ -20,7 +20,7 @@ describe("fa-auth-m8 compatibility contract", () => {
   it("exports the tested contract metadata", () => {
     expect(FA_AUTH_M8_CONTRACT).toBe("fa-auth-m8@2.0");
     expect(FA_AUTH_M8_CONTRACT_VERSION).toBe("2.0");
-    expect(FA_AUTH_M8_TESTED_SERVICE_VERSION).toBe("2.0.0");
+    expect(FA_AUTH_M8_TESTED_SERVICE_VERSION).toBe("2.2.0");
     expect(FA_AUTH_M8_SERVICE_VERSION_RANGE).toBe(">=2.0.0 <3.0.0");
   });
 

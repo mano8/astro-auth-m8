@@ -1,8 +1,11 @@
 export const FA_AUTH_M8_CONTRACT_ID = "fa-auth-m8";
 export const FA_AUTH_M8_CONTRACT_VERSION = "2.0";
 export const FA_AUTH_M8_CONTRACT = `${FA_AUTH_M8_CONTRACT_ID}@${FA_AUTH_M8_CONTRACT_VERSION}` as const;
-// 2.0.0 is the supported fa-auth-m8 service baseline for this plugin.
-export const FA_AUTH_M8_TESTED_SERVICE_VERSION = "2.0.0";
+// 2.2.0 is the fa-auth-m8 release this plugin currently targets. The MIN
+// stays at 2.0.0: the `fa-auth-m8@2.0` API contract is unchanged by 2.1.0
+// (JWKS kid/key binding, audit J1-J4) and 2.2.0 (auth-sdk-m8 3.2.0 floor),
+// so raising the floor would reject backends this plugin still speaks to.
+export const FA_AUTH_M8_TESTED_SERVICE_VERSION = "2.2.0";
 export const FA_AUTH_M8_MIN_SERVICE_VERSION = "2.0.0";
 export const FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE = "3.0.0";
 export const FA_AUTH_M8_SERVICE_VERSION_RANGE = `>=${FA_AUTH_M8_MIN_SERVICE_VERSION} <${FA_AUTH_M8_MAX_SERVICE_VERSION_EXCLUSIVE}`;
