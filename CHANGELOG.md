@@ -8,6 +8,33 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+## 2.5.0
+
+Tracks the published `fa-auth-m8` issuer release. The supported backend
+contract stays `fa-auth-m8@2.0`, range `>=2.0.0 <3.0.0` — no contract repoint,
+so this is not a major.
+
+### Changed
+
+- `FA_AUTH_M8_TESTED_SERVICE_VERSION` and `package.json`'s
+  `faAuthM8.testedServiceVersion` move `2.0.0` → `2.2.0`, the current published
+  `fa-auth-m8` release. `2.1.0` shipped the JWKS `kid`/key-binding remediation
+  (audit `J1`–`J4`: `ACCESS_KEY_ID` must be the DER fingerprint of the key it
+  labels, a single canonical `kid` derivation, a dual-key JWKS overlap window,
+  and `Cache-Control`/`ETag` on the JWKS response); `2.2.0` realigns the issuer
+  onto `auth-sdk-m8 3.2.0`, the consumer half of `J3`.
+- `README.md`'s backend-contract section reworded to say the package *tracks*
+  `2.2.0` rather than claiming a live integration run against it.
+
+### Unchanged, deliberately
+
+- `FA_AUTH_M8_MIN_SERVICE_VERSION` stays `2.0.0`. None of `2.1.0` or `2.2.0`
+  touches the `fa-auth-m8@2.0` API contract this plugin speaks, so raising the
+  floor would reject backends the plugin still works against — and per this
+  file's own versioning rule a backend contract repoint is always a major.
+  The `J1`–`J4` fixes are issuer-side key handling, invisible across the HTTP
+  contract.
+
 ## 2.4.1
 
 No behaviour or public API changes; the supported backend contract stays

@@ -18,7 +18,7 @@ Use it with a `fa-auth-m8` backend that satisfies the `fa-auth-m8@2.0` contract.
 
 ## Backend contract
 
-This package targets the `fa-auth-m8@2.0` API contract and was tested against `fa-auth-m8` service version `2.0.0`. Supported backend service versions are `>=2.0.0 <3.0.0`.
+This package targets the `fa-auth-m8@2.0` API contract and tracks `fa-auth-m8` service version `2.2.0`. Supported backend service versions are `>=2.0.0 <3.0.0` - the contract is unchanged across the 2.x line, so older 2.x backends remain supported.
 
 Compatibility helpers are exported from `@mano8/astro-auth-m8/compatibility`. `fa-auth-m8` (>= 1.0.0) exposes a public `GET {API_PREFIX}/meta` route returning a `ServiceMeta` payload - pass it straight to the assert:
 

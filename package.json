@@ -1,6 +1,6 @@
 {
   "name": "@mano8/astro-auth-m8",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "description": "Astro integration and headless client for fa-auth-m8.",
   "type": "module",
   "license": "MIT",
@@ -106,7 +106,7 @@
   },
   "faAuthM8": {
     "contract": "fa-auth-m8@2.0",
-    "testedServiceVersion": "2.0.0",
+    "testedServiceVersion": "2.2.0",
     "serviceVersionRange": ">=2.0.0 <3.0.0"
   }
 }
