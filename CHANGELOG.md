@@ -35,7 +35,6 @@ so this is not a major.
   The `J1`–`J4` fixes are issuer-side key handling, invisible across the HTTP
   contract.
 
-
 ## 2.4.1
 
 No behaviour or public API changes; the supported backend contract stays
