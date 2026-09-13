@@ -8,6 +8,31 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+## 2.6.0
+
+Tracks the `fa-auth-m8` `2.2.1` issuer release. The supported backend contract
+stays `fa-auth-m8@2.0`, range `>=2.0.0 <3.0.0` — no contract repoint, so this
+is not a major; a minor rather than a patch on the same reasoning as `2.5.0`
+(an exported compatibility constant changes value).
+
+### Changed
+
+- `FA_AUTH_M8_TESTED_SERVICE_VERSION` and `package.json`'s
+  `faAuthM8.testedServiceVersion` move `2.2.0` → `2.2.1`. `2.2.1` is a patch on
+  the issuer's `J1` line: its bundled `init-keys.sh` now verifies the
+  `ACCESS_KEY_ID` / public-key `kid` binding on a keys-exist rerun instead of
+  skipping it. That is provisioning tooling — nothing the issuer serves over
+  HTTP changes, and no dependency floor moves — so this release exists only to
+  keep the tracked version in step with the fleet's compose pins.
+- `README.md` and `REPOSITORY_CONTEXT.md` name `2.2.1`; the latter had still
+  read `2.0.0` after `2.5.0` moved the module and `README.md`.
+
+### Unchanged, deliberately
+
+- `FA_AUTH_M8_MIN_SERVICE_VERSION` stays `2.0.0`, for the reason `2.5.0`
+  recorded: nothing on the `2.x` line has touched the `fa-auth-m8@2.0` API
+  contract this plugin speaks.
+
 ## 2.5.0
 
 Tracks the published `fa-auth-m8` issuer release. The supported backend
