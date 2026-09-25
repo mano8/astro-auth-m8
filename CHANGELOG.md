@@ -8,6 +8,18 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+### Security
+
+- **npm is reached only from a published release**
+  (`B30-pre-publish-hardening` leg 5, finding `G25`). `npm-publish.yml` ran
+  `npm publish` on any `workflow_dispatch`, from any branch, into an `npm`
+  environment with no protection. A dispatch now
+  runs `npm publish --dry-run`; a release fails unless its tag, with the `v`
+  stripped, is `package.json`'s `version`; and the environment links
+  `@mano8/astro-auth-m8` instead of the retired `@fa-m8/` scope.
+  `tests/publish-workflow.test.ts` locks each rule. The operator's `v*` tag
+  policy on the `npm` environment is the platform half of the same rule.
+
 ## 2.6.0
 
 Tracks the `fa-auth-m8` `2.2.1` issuer release. The supported backend contract
