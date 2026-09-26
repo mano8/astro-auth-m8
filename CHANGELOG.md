@@ -8,6 +8,44 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+## 2.7.0
+
+Tracks the published `fa-auth-m8` `2.2.3` issuer release. The supported backend
+contract stays `fa-auth-m8@2.0`, range `>=2.0.0 <3.0.0` — no contract repoint,
+so this is not a major; a minor rather than a patch on the same reasoning as
+`2.5.0` and `2.6.0` (an exported compatibility constant changes value).
+
+### Changed
+
+- `FA_AUTH_M8_TESTED_SERVICE_VERSION` and `package.json`'s
+  `faAuthM8.testedServiceVersion` move `2.2.1` → `2.2.3`
+  (`B31-plugin-tracking-tail`, finding `G32`). Read from `v2.2.1` to `v2.2.3`
+  on the issuer, nothing this plugin models moved: `2.2.2` is the Debian patch
+  layer, and `2.2.3` pins the PostgreSQL session clock to UTC, migrates
+  timestamps to `timestamptz`, and has `GET /users/`, `GET /sessions/` and the
+  privileged-action audit list validate each row through the `*Public` model
+  they already declared — the same payload shapes. Timestamps now always carry
+  a UTC offset; this package types them as strings, so both forms parse.
+- `README.md` and `REPOSITORY_CONTEXT.md` name `2.2.3`.
+
+### Unchanged, deliberately
+
+- `FA_AUTH_M8_MIN_SERVICE_VERSION` stays `2.0.0` and the contract stays
+  `fa-auth-m8@2.0`, for the reason `2.5.0` recorded: nothing on the `2.x` line
+  has touched the API contract this plugin speaks.
+
+### Security
+
+- **npm is reached only from a published release**
+  (`B30-pre-publish-hardening` leg 5, finding `G25`). `npm-publish.yml` ran
+  `npm publish` on any `workflow_dispatch`, from any branch, into an `npm`
+  environment with no protection. A dispatch now
+  runs `npm publish --dry-run`; a release fails unless its tag, with the `v`
+  stripped, is `package.json`'s `version`; and the environment links
+  `@mano8/astro-auth-m8` instead of the retired `@fa-m8/` scope.
+  `tests/publish-workflow.test.ts` locks each rule. The operator's `v*` tag
+  policy on the `npm` environment is the platform half of the same rule.
+
 ## 2.6.0
 
 Tracks the `fa-auth-m8` `2.2.1` issuer release. The supported backend contract
