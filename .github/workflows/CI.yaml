@@ -24,6 +24,13 @@ jobs:
           node-version: "22.13.0"
           cache: "npm"
           cache-dependency-path: package-lock.json
+      # `B34-npm-lock-integrity-guard`: refuse a lock whose entries are not all
+      # sha512-pinned to registry.npmjs.org, before `npm ci` trusts it. `npm ci`
+      # installs an entry with no `integrity` without checking a hash, and says
+      # nothing (`G33`). Dependency-free, so it needs no install; run in every
+      # job that installs, so no job can run on an unverified tree.
+      - name: Lock integrity
+        run: npm run verify:lock-integrity
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
@@ -63,6 +70,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
           cache-dependency-path: package-lock.json
+      - name: Lock integrity
+        run: npm run verify:lock-integrity
       - run: npm ci
       - run: npm test
       - if: matrix.node-version == '22.13.0'
@@ -95,6 +104,8 @@ jobs:
           node-version: "22.13.0"
           cache: "npm"
           cache-dependency-path: package-lock.json
+      - name: Lock integrity
+        run: npm run verify:lock-integrity
       - run: npm ci
       # Dev dependencies stay in scope, per the fleet policy decided under `D-C5`:
       # a dev advisory does not reach a consumer, but it does reach the machine
