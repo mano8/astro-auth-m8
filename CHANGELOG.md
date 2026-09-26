@@ -8,6 +8,14 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+## 2.7.1
+
+Tracks the published `@mano8/astro-ui-m8` `1.5.2` (`B39-astro-ui-changelog-release`,
+finding `G38`): the shared UI package's first tarball to ship its changelog.
+A patch, because the only shipped change is `package.json`'s dependency floor;
+the supported backend contract stays `fa-auth-m8@2.0`, range
+`>=2.0.0 <3.0.0`, and the tested service version stays `2.2.3`.
+
 ### Added
 
 - **A lock that does not pin every package fails the build**
@@ -25,6 +33,12 @@ this package's own surface: a backend contract repoint is always a major.
   This lock already passed; the fixtures prove the red path. Only
   `package.json`'s `scripts` gains an entry, so no release is owed.
 
+### Changed
+
+- `@mano8/astro-ui-m8` floor `^1.5.1` → `^1.5.2` in `dependencies`, the
+  newest published release (§0.5's explicit-pin rule). The lock moves that
+  one entry, with its registry `resolved` and `sha512` `integrity`.
+
 ### Security
 
 - **`devalue` moves past the moderate advisory GHSA-9rgm-9g3h-6x36**
@@ -35,6 +49,12 @@ this package's own surface: a backend contract repoint is always a major.
   `integrity`. Nothing else in the lock changed, `package.json` did not
   change, and `npm audit` now reads 0 at every severity. The lock does not
   ship in the tarball, so no release is owed.
+- **The publish job verifies the lock before it installs**
+  (`B37-publish-lock-guard`, finding `G36`). `B34` guarded every `CI.yaml`
+  job but not the one that holds `id-token: write` and builds the tarball,
+  and the environment's `tag:v*` rule matches a tag by name, not by where it
+  points. `npm-publish.yml` now runs `npm run verify:lock-integrity` before
+  `npm ci`, and `tests/publish-workflow.test.ts` holds the order.
 
 ## 2.7.0
 
