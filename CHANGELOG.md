@@ -25,6 +25,17 @@ this package's own surface: a backend contract repoint is always a major.
   This lock already passed; the fixtures prove the red path. Only
   `package.json`'s `scripts` gains an entry, so no release is owed.
 
+### Security
+
+- **`devalue` moves past the moderate advisory GHSA-9rgm-9g3h-6x36**
+  (`B35-astro-auth-devalue`, finding `G35`). The lock resolved `devalue`
+  `5.8.1`, a dev-only transitive of `astro` and `@astrojs/react`, where the
+  sibling plugins already had `5.9.x`. `npm audit fix --package-lock-only`
+  moved exactly that one entry to `5.9.4`, with its `resolved` and `sha512`
+  `integrity`. Nothing else in the lock changed, `package.json` did not
+  change, and `npm audit` now reads 0 at every severity. The lock does not
+  ship in the tarball, so no release is owed.
+
 ## 2.7.0
 
 Tracks the published `fa-auth-m8` `2.2.3` issuer release. The supported backend
