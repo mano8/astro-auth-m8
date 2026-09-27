@@ -8,6 +8,46 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+## 2.7.2
+
+Admits `@astrojs/react` 7 and Starlight 0.42 as peers, and adds the fleet's
+dependency compatibility gate. A patch: only peer ranges widen, and both old
+lines stay accepted. The supported backend contract stays `fa-auth-m8@2.0`
+(range `>=2.0.0 <3.0.0`), and the tested service version stays `2.2.3`.
+
+### Changed
+
+- **Peer `@astrojs/react` `^6.0.1` → `^6.0.1 || ^7.0.0`.** A host on
+  `@astrojs/react` 7 (Dependabot's `fa-ui-m8` #40) failed this peer. The
+  package imports nothing from `@astrojs/react`. 7.0.0 keeps the same React
+  peer ranges and adds only an optional `oxc-transform-react` peer.
+- **Peer `@astrojs/starlight` `^0.41.3` → `^0.41.3 || ^0.42.0`.** Starlight
+  0.42 is the line built for `astro` 7.3. Under 0.41, `@astrojs/mdx` 7 pins
+  `@astrojs/markdown-remark` 7.2.x, which is outside the `^7.3.0` optional
+  peer that `astro` 7.3 declares. The 0.42 breaking changes (mobile-menu
+  markup, the `tagline` option, `astro` ≥ 7.2.10) touch nothing this package
+  overrides or configures.
+- Dev dependencies now test the new lines: `@astrojs/react` `^7.0.0`,
+  `@astrojs/starlight` `^0.42.4`, `astro` `^7.3.4`, `react` / `react-dom` /
+  `@types/react` `^19.3.0`, `@typescript-eslint/*` `^8.70.1` and `globals`
+  `^17.12.0`, all matching `fa-ui-m8`. `@types/react-dom` `^19.3.0` is now
+  declared: it is a required peer of `@astrojs/react`, which npm used to
+  install on its own.
+
+### Added
+
+- **A tree that breaks a declared range fails the build.**
+  `scripts/verify-dependency-compat.mjs` (`npm run verify:dependency-compat`)
+  and `tests/dependency-compat.test.ts`, byte-identical across the fleet's
+  six npm repositories and first shipped in `@mano8/astro-ui-m8` `1.5.3`.
+  The gate reads `npm ls --all --json --long` with peer edges forced on. It
+  names every installed package outside a range declared on it, and every
+  missing required dependency or peer outside an optional platform binary.
+  CI runs it after `npm ci`.
+- **`.npmrc` with `legacy-peer-deps=true`**, byte-identical fleet-wide. npm
+  and Dependabot never refuse to resolve on a peer conflict, and the gate
+  above enforces the ranges instead.
+
 ## 2.7.1
 
 Tracks the published `@mano8/astro-ui-m8` `1.5.2` (`B39-astro-ui-changelog-release`,
