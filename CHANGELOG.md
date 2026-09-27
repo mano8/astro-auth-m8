@@ -8,6 +8,17 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The dependency compatibility gate runs `npm ls` without a shell.**
+  Outside `npm run`, `scripts/verify-dependency-compat.mjs` spawned `npm`
+  through a shell to find `npm.cmd` on Windows, which Codacy's Semgrep
+  (`spawn-shell-true`) flags. It now runs the npm that is running it, or the
+  npm bundled beside this Node, through `process.execPath`.
+  `tests/dependency-compat.test.ts` covers that path by running the gate
+  with `npm_execpath` removed. Neither file is in the published tarball, so
+  no release is owed. Byte-identical across the fleet's npm repositories.
+
 ## 2.7.2
 
 Admits `@astrojs/react` 7 and Starlight 0.42 as peers, tracks the published
