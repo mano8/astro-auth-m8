@@ -10,13 +10,21 @@ this package's own surface: a backend contract repoint is always a major.
 
 ## 2.7.2
 
-Admits `@astrojs/react` 7 and Starlight 0.42 as peers, and adds the fleet's
-dependency compatibility gate. A patch: only peer ranges widen, and both old
-lines stay accepted. The supported backend contract stays `fa-auth-m8@2.0`
-(range `>=2.0.0 <3.0.0`), and the tested service version stays `2.2.3`.
+Admits `@astrojs/react` 7 and Starlight 0.42 as peers, tracks the published
+`@mano8/astro-ui-m8` `1.5.3`, and adds the fleet's dependency compatibility
+gate. A patch: peer ranges only widen, with both old lines still accepted,
+and the one floor that rises is to a published release. The supported
+backend contract stays `fa-auth-m8@2.0` (range `>=2.0.0 <3.0.0`), and the
+tested service version stays `2.2.3`.
 
 ### Changed
 
+- **`@mano8/astro-ui-m8` floor `^1.5.2` → `^1.5.3`** in `dependencies`: the
+  newest published release, read back as npm `latest`, with tag `v1.5.3` =
+  `main` `6ec692b`. 1.5.3 is the release whose `lucide-react` peer accepts
+  `^1.28.0` rather than exactly `1.28.0`, so a host on a newer `1.x` no
+  longer breaks it. The lock moves that one entry; its `integrity` equals the
+  registry's `dist.integrity`.
 - **Peer `@astrojs/react` `^6.0.1` → `^6.0.1 || ^7.0.0`.** A host on
   `@astrojs/react` 7 (Dependabot's `fa-ui-m8` #40) failed this peer. The
   package imports nothing from `@astrojs/react`. 7.0.0 keeps the same React
