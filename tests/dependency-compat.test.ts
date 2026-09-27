@@ -202,10 +202,30 @@ describe("findCompatProblems: fixture trees", () => {
     expect(findCompatProblems(tree)).toMatchObject({ problems: [], skipped: [] });
   });
 
-  it("refuses every other npm ls problem, such as an extraneous package", () => {
-    const tree = { ...cleanTree(), problems: ["extraneous: left-pad@1.3.0 /fixture/node_modules/left-pad"] };
+  it("skips a missing peer of a platform binary npm 10 leaves extraneous", () => {
+    const tree = withChild(
+      cleanTree(),
+      null,
+      "@napi-rs/wasm-runtime",
+      installed("node_modules/@napi-rs/wasm-runtime", "1.2.4", {
+        extraneous: true,
+        peerDependencies: { "@emnapi/core": "^1.7.1" },
+        dependencies: { "@emnapi/core": { missing: true } },
+      }),
+    );
+    tree.problems = ["extraneous: @napi-rs/wasm-runtime@1.2.4 /fixture/node_modules/@napi-rs/wasm-runtime"];
+    const result = findCompatProblems(tree);
+    expect(result.problems).toEqual([]);
+    expect(result.skipped).toEqual([
+      '@emnapi/core is missing: @napi-rs/wasm-runtime (node_modules/@napi-rs/wasm-runtime) requires "^1.7.1" (peer)',
+      "extraneous: @napi-rs/wasm-runtime@1.2.4 /fixture/node_modules/@napi-rs/wasm-runtime (reached by no edge)",
+    ]);
+  });
+
+  it("refuses an npm ls problem of a kind it does not know", () => {
+    const tree = { ...cleanTree(), problems: ["unexpected: left-pad@1.3.0 /fixture/node_modules/left-pad"] };
     expect(findCompatProblems(tree).problems).toEqual([
-      "npm ls: extraneous: left-pad@1.3.0 /fixture/node_modules/left-pad",
+      "npm ls: unexpected: left-pad@1.3.0 /fixture/node_modules/left-pad",
     ]);
   });
 

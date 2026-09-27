@@ -21,9 +21,10 @@
 //     dependency, optional dependency, dev dependency or peer. Optional peers
 //     count too, because an optional peer that is present gets used;
 //   * a required dependency or peer that is not installed (`missing`), unless
-//     its requirer is itself installed only as an optional dependency (the
-//     per-platform native binaries, which npm may legitimately skip);
-//   * any other problem `npm ls` reports (for example `extraneous`);
+//     no required edge reaches its requirer: the per-platform native binaries,
+//     which npm 11 flags as optional installs and npm 10 leaves `extraneous`;
+//   * any other problem `npm ls` reports, except `extraneous` (a package on
+//     disk that no edge reaches), which is listed but is not a range problem;
 //   * a waiver that no longer matches anything, or a waiver file that is not
 //     well formed.
 //
@@ -66,23 +67,28 @@ function locationOf(rootPath, nodePath) {
 }
 
 /**
- * Every installed node of an `npm ls --long` tree, keyed by location (`""` is the root).
+ * Every installed node of an `npm ls --long` tree, keyed by location (`""` is
+ * the root), plus the locations no required edge reaches: installed only as an
+ * optional dependency (npm 11 flags the per-platform binaries so), or reached
+ * by no edge at all (`extraneous`, the state npm 10 leaves them in).
  *
  * @param {Record<string, any>} tree
- * @returns {Map<string, Record<string, any>>}
+ * @returns {{ nodes: Map<string, Record<string, any>>, unreached: Set<string> }}
  */
 export function indexNodes(tree) {
   const nodes = new Map([[ROOT, tree]]);
+  const unreached = new Set();
   const visit = (node) => {
     for (const [, child] of entriesOf(node.dependencies)) {
       if (!isObject(child) || typeof child.path !== "string") continue;
       const location = locationOf(tree.path, child.path);
       if (!nodes.has(location)) nodes.set(location, child);
+      if (child.optional === true || child.extraneous === true) unreached.add(location);
       visit(child);
     }
   };
   visit(tree);
-  return nodes;
+  return { nodes, unreached };
 }
 
 /**
@@ -164,6 +170,114 @@ export function describeFinding(finding) {
 }
 
 /**
+ * The mutable state of one check: the indexed tree, the waivers, and what was found.
+ *
+ * @param {Record<string, any>} tree
+ * @param {unknown} waiverDocument
+ */
+function createCheck(tree, waiverDocument) {
+  const { nodes, unreached } = indexNodes(tree);
+  const { waivers, errors } = parseWaivers(waiverDocument);
+  return { tree, nodes, unreached, waivers, used: new Set(), seen: new Set(), problems: [...errors], waived: [], skipped: [] };
+}
+
+function requirerName(check, location) {
+  if (location === ROOT) return check.tree.name ?? ROOT_LABEL;
+  return check.nodes.get(location)?.name ?? location;
+}
+
+/**
+ * File one finding once: skipped, waived, or a problem.
+ *
+ * @param {ReturnType<typeof createCheck>} check
+ * @param {{ kind: string, dependency: string, version?: string, edge: { type: string, spec?: string }, requirer: string, location: string }} finding
+ */
+function report(check, finding) {
+  const key = `${finding.kind}\0${finding.location}\0${finding.dependency}`;
+  if (check.seen.has(key)) return;
+  check.seen.add(key);
+  const line = describeFinding(finding);
+  if (finding.kind === "missing" && check.unreached.has(finding.location)) {
+    check.skipped.push(line);
+    return;
+  }
+  const index = check.waivers.findIndex(
+    (waiver) => waiver.requirer === finding.requirer && waiver.dependency === finding.dependency,
+  );
+  if (index < 0) {
+    check.problems.push(line);
+    return;
+  }
+  check.used.add(index);
+  const ours = finding.location === ROOT || finding.requirer.startsWith(FLEET_SCOPE);
+  if (!ours && finding.edge.type === "peerOptional") {
+    check.waived.push(`${line} (waived: ${check.waivers[index].reason})`);
+    return;
+  }
+  check.problems.push(`${line} (a waiver cannot excuse a ${finding.edge.type} edge)`);
+}
+
+function checkMissing(check, parent, location, name) {
+  const edge = edgeOf(parent, name, location === ROOT);
+  if (edge.type === "optional" || edge.type === "peerOptional") return;
+  report(check, { kind: "missing", dependency: name, edge, requirer: requirerName(check, location), location });
+}
+
+function checkInvalid(check, name, child) {
+  const parsed = parseInvalid(child.invalid);
+  if (!parsed) {
+    check.problems.push(`${name}@${child.version} is invalid (${child.invalid})`);
+    return;
+  }
+  const requirerNode = check.nodes.get(parsed.location);
+  const declared = requirerNode ? edgeOf(requirerNode, name, parsed.location === ROOT) : { type: "unknown" };
+  report(check, {
+    kind: "invalid",
+    dependency: name,
+    version: child.version,
+    edge: { type: declared.type, spec: parsed.spec },
+    requirer: requirerName(check, parsed.location),
+    location: parsed.location,
+  });
+}
+
+function visitNode(check, parent) {
+  const location = parent === check.tree ? ROOT : locationOf(check.tree.path, parent.path);
+  for (const [name, child] of entriesOf(parent.dependencies)) {
+    if (!isObject(child)) continue;
+    if (child.missing === true) {
+      checkMissing(check, parent, location, name);
+      continue;
+    }
+    // Not installed and not required (an unmet optional edge): nothing to check below it.
+    if (typeof child.path !== "string") continue;
+    if (typeof child.invalid === "string") checkInvalid(check, name, child);
+    visitNode(check, child);
+  }
+}
+
+/**
+ * The problems `npm ls` lists that the walk does not account for. `extraneous`
+ * (on disk, reached by no edge) is noted, not failed: it is not a range problem,
+ * and npm 10 leaves the per-platform binaries it did not need in that state.
+ */
+function checkOtherProblems(check) {
+  for (const problem of Array.isArray(check.tree.problems) ? check.tree.problems : []) {
+    if (/^(invalid|missing): /.test(problem)) continue;
+    if (problem.startsWith("extraneous: ")) check.skipped.push(`${problem} (reached by no edge)`);
+    else check.problems.push(`npm ls: ${problem}`);
+  }
+}
+
+function checkStaleWaivers(check) {
+  check.waivers.forEach((waiver, index) => {
+    if (!check.used.has(index)) {
+      check.problems.push(`waiver for ${waiver.requirer} -> ${waiver.dependency} matches nothing any more; remove it`);
+    }
+  });
+}
+
+/**
  * Every compatibility problem in an `npm ls --all --json --long` tree.
  *
  * @param {Record<string, any>} tree
@@ -174,80 +288,11 @@ export function findCompatProblems(tree, waiverDocument) {
   if (!isObject(tree) || typeof tree.path !== "string") {
     return { packages: 0, problems: ["the npm ls output is not a --long JSON tree"], waived: [], skipped: [] };
   }
-  const nodes = indexNodes(tree);
-  const { waivers, errors } = parseWaivers(waiverDocument);
-  const used = new Set();
-  const problems = [...errors];
-  const waived = [];
-  const skipped = [];
-  const seen = new Set();
-
-  const nameAt = (location, node) => (location === ROOT ? tree.name ?? ROOT_LABEL : node?.name ?? location);
-  const report = (finding, requirerNode) => {
-    const key = `${finding.kind}\0${finding.location}\0${finding.dependency}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    const line = describeFinding(finding);
-    const ours = finding.location === ROOT || finding.requirer.startsWith(FLEET_SCOPE);
-    if (finding.kind === "missing" && requirerNode?.optional === true) {
-      skipped.push(line);
-      return;
-    }
-    const index = waivers.findIndex(
-      (waiver) => waiver.requirer === finding.requirer && waiver.dependency === finding.dependency,
-    );
-    if (index >= 0) used.add(index);
-    if (index >= 0 && !ours && finding.edge.type === "peerOptional") {
-      waived.push(`${line} (waived: ${waivers[index].reason})`);
-      return;
-    }
-    problems.push(index >= 0 ? `${line} (a waiver cannot excuse a ${finding.edge.type} edge)` : line);
-  };
-
-  const visit = (parent) => {
-    const parentLocation = parent === tree ? ROOT : locationOf(tree.path, parent.path);
-    for (const [name, child] of entriesOf(parent.dependencies)) {
-      if (!isObject(child)) continue;
-      if (child.missing === true) {
-        const edge = edgeOf(parent, name, parent === tree);
-        if (edge.type === "optional" || edge.type === "peerOptional") continue;
-        const requirer = nameAt(parentLocation, parent);
-        report({ kind: "missing", dependency: name, edge, requirer, location: parentLocation }, parent);
-        continue;
-      }
-      // Not installed and not required (an unmet optional edge): nothing to check below it.
-      if (typeof child.path !== "string") continue;
-      if (typeof child.invalid === "string") {
-        const parsed = parseInvalid(child.invalid);
-        if (!parsed) {
-          problems.push(`${name}@${child.version} is invalid (${child.invalid})`);
-        } else {
-          const requirerNode = nodes.get(parsed.location);
-          const edge = requirerNode
-            ? { ...edgeOf(requirerNode, name, parsed.location === ROOT), spec: parsed.spec }
-            : { type: "unknown", spec: parsed.spec };
-          const requirer = nameAt(parsed.location, requirerNode);
-          report(
-            { kind: "invalid", dependency: name, version: child.version, edge, requirer, location: parsed.location },
-            requirerNode,
-          );
-        }
-      }
-      visit(child);
-    }
-  };
-  visit(tree);
-
-  const accounted = /^(invalid|missing): /;
-  for (const problem of Array.isArray(tree.problems) ? tree.problems : []) {
-    if (!accounted.test(problem)) problems.push(`npm ls: ${problem}`);
-  }
-  waivers.forEach((waiver, index) => {
-    if (!used.has(index)) {
-      problems.push(`waiver for ${waiver.requirer} -> ${waiver.dependency} matches nothing any more; remove it`);
-    }
-  });
-  return { packages: nodes.size - 1, problems, waived, skipped };
+  const check = createCheck(tree, waiverDocument);
+  visitNode(check, tree);
+  checkOtherProblems(check);
+  checkStaleWaivers(check);
+  return { packages: check.nodes.size - 1, problems: check.problems, waived: check.waived, skipped: check.skipped };
 }
 
 /**
@@ -273,51 +318,68 @@ function runNpmLs(cwd) {
 }
 
 /**
+ * The tree (from `--tree`, else from `npm ls`) and the parsed waivers file, if any. Throws on unreadable input.
+ *
+ * @param {string[]} argv
+ * @returns {{ tree: unknown, waiverDocument: unknown }}
+ */
+function readInputs(argv) {
+  const option = (flag) => {
+    const at = argv.indexOf(flag);
+    return at >= 0 ? argv[at + 1] : undefined;
+  };
+  const treePath = option("--tree");
+  const waiversPath = option("--waivers") ?? fileURLToPath(new URL("../dependency-compat.waivers.json", import.meta.url));
+  let tree;
+  if (treePath) {
+    tree = JSON.parse(readFileSync(treePath, "utf8"));
+  } else {
+    const result = runNpmLs(fileURLToPath(new URL("..", import.meta.url)));
+    if (result.error) throw new Error(result.error);
+    tree = result.tree;
+  }
+  const waiverDocument = existsSync(waiversPath) ? JSON.parse(readFileSync(waiversPath, "utf8")) : undefined;
+  return { tree, waiverDocument };
+}
+
+/**
+ * Print a check's result; returns the exit code.
+ *
+ * @param {ReturnType<typeof findCompatProblems>} result
+ * @returns {number}
+ */
+function printVerdict({ packages, problems, waived, skipped }) {
+  for (const line of waived) console.log(`  waived: ${line}`);
+  for (const line of skipped) console.log(`  skipped: ${line}`);
+  if (problems.length === 0) {
+    console.log(`dependency-compat: ${packages} installed packages, every declared range satisfied`);
+    return 0;
+  }
+  console.error(`dependency-compat: ${problems.length} problem(s) across ${packages} installed packages`);
+  for (const line of problems) console.error(`  ${line}`);
+  console.error(
+    "Move the dependency into a range every requirer accepts. Where the requirer is an @mano8 " +
+      "package, widen its range in that repository and release it first. A Dependabot pull request " +
+      "that fails here is reporting a real incompatibility, not a flaky build.",
+  );
+  return 1;
+}
+
+/**
  * CLI entry: prints a verdict and returns the exit code.
  *
  * @param {string[]} argv
  * @returns {number}
  */
 export function main(argv) {
-  const option = (flag) => {
-    const at = argv.indexOf(flag);
-    return at >= 0 ? argv[at + 1] : undefined;
-  };
-  const projectDir = fileURLToPath(new URL("..", import.meta.url));
-  const treePath = option("--tree");
-  const waiversPath = option("--waivers") ?? fileURLToPath(new URL("../dependency-compat.waivers.json", import.meta.url));
-
-  let tree;
-  let waiverDocument;
+  let inputs;
   try {
-    if (treePath) {
-      tree = JSON.parse(readFileSync(treePath, "utf8"));
-    } else {
-      const result = runNpmLs(projectDir);
-      if (result.error) throw new Error(result.error);
-      tree = result.tree;
-    }
-    if (existsSync(waiversPath)) waiverDocument = JSON.parse(readFileSync(waiversPath, "utf8"));
+    inputs = readInputs(argv);
   } catch (error) {
     console.error(`dependency-compat: ${error.message}`);
     return 1;
   }
-
-  const { packages, problems, waived, skipped } = findCompatProblems(tree, waiverDocument);
-  for (const line of waived) console.log(`  waived: ${line}`);
-  for (const line of skipped) console.log(`  skipped (optional install): ${line}`);
-  if (problems.length > 0) {
-    console.error(`dependency-compat: ${problems.length} problem(s) across ${packages} installed packages`);
-    for (const line of problems) console.error(`  ${line}`);
-    console.error(
-      "Move the dependency into a range every requirer accepts. Where the requirer is an @mano8 " +
-        "package, widen its range in that repository and release it first. A Dependabot pull request " +
-        "that fails here is reporting a real incompatibility, not a flaky build.",
-    );
-    return 1;
-  }
-  console.log(`dependency-compat: ${packages} installed packages, every declared range satisfied`);
-  return 0;
+  return printVerdict(findCompatProblems(inputs.tree, inputs.waiverDocument));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
